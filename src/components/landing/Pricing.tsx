@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Check } from "lucide-react";
 
@@ -48,13 +47,12 @@ export function Pricing() {
               ))}
             </div>
 
-            <Button
-              size="lg"
-              asChild
-              className="w-full bg-[#F59E0B] hover:bg-[#D97706] text-[#0A0A0F] font-semibold py-6 rounded-full transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+            <Link
+              href="/onboarding"
+              className="inline-flex items-center justify-center rounded-full text-lg font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background h-11 px-8 w-full bg-[#F59E0B] hover:bg-[#D97706] text-[#0A0A0F]"
             >
-              <Link href="/onboarding">Start Free — First 3 recoveries</Link>
-            </Button>
+              Start Free — First 3 recoveries
+            </Link>
           </CardContent>
         </Card>
       </div>
