@@ -112,13 +112,13 @@ export function PaymentList() {
             </div>
           </div>
 
-          {/* Table Header */}
-          <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-[#5A5A6E] uppercase tracking-wider border-b border-[#22222E]">
-            <div className="col-span-4 sm:col-span-3">Customer</div>
+          {/* Table Header — hidden on mobile */}
+          <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-[#5A5A6E] uppercase tracking-wider border-b border-[#22222E]">
+            <div className="col-span-4 lg:col-span-3">Customer</div>
             <div className="col-span-2">Amount</div>
-            <div className="col-span-2 sm:col-span-2">Failed</div>
-            <div className="col-span-2 sm:col-span-2">Status</div>
-            <div className="col-span-2 sm:col-span-3 text-right">Actions</div>
+            <div className="col-span-2">Failed</div>
+            <div className="col-span-2">Status</div>
+            <div className="col-span-2 lg:col-span-3 text-right">Actions</div>
           </div>
 
           {/* Rows */}
