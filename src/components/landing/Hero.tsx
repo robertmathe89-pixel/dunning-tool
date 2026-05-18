@@ -1,14 +1,9 @@
 "use client";
 
-import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ChevronDown } from "lucide-react";
 
-interface HeroProps {
-  onSimulate?: () => void;
-}
-
-export function Hero({ onSimulate }: HeroProps) {
+export function Hero() {
   const handleScrollToDemo = () => {
     const demoSection = document.getElementById("simulate-demo");
     if (demoSection) {
@@ -48,7 +43,7 @@ export function Hero({ onSimulate }: HeroProps) {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
           <Button
             size="lg"
-            onClick={onSimulate || handleScrollToDemo}
+            onClick={handleScrollToDemo}
             className="bg-[#F59E0B] hover:bg-[#D97706] text-[#0A0A0F] font-semibold px-8 py-6 text-lg rounded-full transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
           >
             Simulate a Failed Payment

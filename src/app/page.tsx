@@ -12,10 +12,7 @@ export default function LandingPage() {
     <main className="min-h-screen bg-[#0A0A0F]">
       <LandingNav />
       <div className="pt-14">
-        <Hero onSimulate={() => {
-          const el = document.getElementById("simulate-demo");
-          if (el) el.scrollIntoView({ behavior: "smooth" });
-        }} />
+        <Hero />
         <ProblemSection />
         <SimulateDemo />
         <HowItWorks />
