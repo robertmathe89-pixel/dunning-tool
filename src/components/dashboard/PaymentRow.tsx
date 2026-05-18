@@ -37,12 +37,12 @@ export function PaymentRow({ payment, onSelect }: PaymentRowProps) {
   };
 
   return (
-    <>
+    <div
+      onClick={() => onSelect(payment)}
+      className={`border-b border-[#22222E] last:border-0 border-l-2 ${leftBorderColor[payment.status]} hover:bg-[#1A1A24]/50 transition-colors duration-200 cursor-pointer`}
+    >
       {/* Desktop Table Row */}
-      <div
-        onClick={() => onSelect(payment)}
-        className={`hidden sm:grid grid-cols-12 gap-4 px-4 py-4 items-center border-b border-[#22222E] last:border-0 border-l-2 ${leftBorderColor[payment.status]} hover:bg-[#1A1A24]/50 transition-colors duration-200 cursor-pointer`}
-      >
+      <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-4 items-center">
         {/* Customer */}
         <div className="col-span-4 lg:col-span-3">
           <div className="flex items-center gap-3">
@@ -127,10 +127,7 @@ export function PaymentRow({ payment, onSelect }: PaymentRowProps) {
       </div>
 
       {/* Mobile Card */}
-      <div
-        onClick={() => onSelect(payment)}
-        className={`sm:hidden border-b border-[#22222E] last:border-0 border-l-2 ${leftBorderColor[payment.status]} hover:bg-[#1A1A24]/50 transition-colors duration-200 cursor-pointer`}
-      >
+      <div className="sm:hidden">
         <div className="p-4 space-y-3">
           {/* Top row: Avatar + Name + Status */}
           <div className="flex items-center justify-between">
@@ -216,6 +213,6 @@ export function PaymentRow({ payment, onSelect }: PaymentRowProps) {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
