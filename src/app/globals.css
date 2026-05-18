@@ -6,6 +6,11 @@
 }
 
 @theme {
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+
   --color-background: #0A0A0F;
   --color-surface: #111118;
   --color-surface-hover: #1A1A24;

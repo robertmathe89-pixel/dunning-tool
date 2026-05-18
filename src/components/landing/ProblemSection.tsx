@@ -29,9 +29,9 @@ export function ProblemSection() {
             sublabel="monthly"
           />
           <StatCard
-            value="60%"
-            label="churn if"
-            sublabel="ignored"
+            value="Most"
+            label="founders never"
+            sublabel="follow up"
             highlight
           />
           <StatCard

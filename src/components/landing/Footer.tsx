@@ -20,13 +20,13 @@ export function Footer() {
 
           {/* Links */}
           <div className="flex items-center gap-6">
-            <a href="#" className="text-sm text-[#8A8A9E] hover:text-white transition-colors duration-200">
-              Privacy
-            </a>
-            <a href="#" className="text-sm text-[#8A8A9E] hover:text-white transition-colors duration-200">
-              Terms
-            </a>
-            <a href="#" className="text-sm text-[#8A8A9E] hover:text-white transition-colors duration-200">
+            <span className="text-sm text-[#5A5A6E]">
+              Privacy (soon)
+            </span>
+            <span className="text-sm text-[#5A5A6E]">
+              Terms (soon)
+            </span>
+            <a href="mailto:ai.studioprojects2025@gmail.com" className="text-sm text-[#8A8A9E] hover:text-white transition-colors duration-200">
               Contact
             </a>
           </div>
