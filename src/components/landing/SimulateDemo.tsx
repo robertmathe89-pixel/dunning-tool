@@ -9,10 +9,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowRight, Mail, Send } from "lucide-react";
+import { ArrowRight, Mail, Send, AlertCircle } from "lucide-react";
 
 export function SimulateDemo() {
   const [showModal, setShowModal] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+
+  const handleSendTest = () => {
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
 
   return (
     <section id="simulate-demo" className="py-24 bg-[#0A0A0F]">
@@ -105,17 +111,28 @@ export function SimulateDemo() {
                   Hi John, looks like your payment didn't go through. No worries — this happens...
                 </p>
               </div>
-              <div className="flex gap-3">
-                <Button className="flex-1 bg-[#F59E0B] hover:bg-[#D97706] text-[#0A0A0F] font-semibold transition-all duration-200">
-                  Send Test to Me
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 border-[#22222E] text-white hover:bg-[#1A1A24] hover:text-white transition-all duration-200"
-                >
-                  Close
-                </Button>
+              <div className="space-y-3">
+                {showToast && (
+                  <div className="flex items-center gap-2 text-[#F59E0B] bg-[#F59E0B]/10 border border-[#F59E0B]/20 rounded-lg p-3 text-sm">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    Email backend coming soon — this is a UI preview only
+                  </div>
+                )}
+                <div className="flex gap-3">
+                  <Button 
+                    onClick={handleSendTest}
+                    className="flex-1 bg-[#F59E0B] hover:bg-[#D97706] text-[#0A0A0F] font-semibold transition-all duration-200"
+                  >
+                    Send Test to Me
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowModal(false)}
+                    className="flex-1 border-[#22222E] text-white hover:bg-[#1A1A24] hover:text-white transition-all duration-200"
+                  >
+                    Close
+                  </Button>
+                </div>
               </div>
             </div>
           </DialogContent>

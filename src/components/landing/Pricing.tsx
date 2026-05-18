@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Check } from "lucide-react";
@@ -49,9 +50,10 @@ export function Pricing() {
 
             <Button
               size="lg"
+              asChild
               className="w-full bg-[#F59E0B] hover:bg-[#D97706] text-[#0A0A0F] font-semibold py-6 rounded-full transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
             >
-              Start Free — First 3 recoveries
+              <Link href="/onboarding">Start Free — First 3 recoveries</Link>
             </Button>
           </CardContent>
         </Card>
