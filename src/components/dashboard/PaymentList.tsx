@@ -6,18 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Search, Filter, Zap } from "lucide-react";
-import { PaymentRow } from "./PaymentRow";
+import { PaymentRow, type Payment } from "./PaymentRow";
 import { DetailPanel } from "./DetailPanel";
 import { EmptyState } from "./EmptyState";
 
-const demoPayments = [
+const demoPayments: Payment[] = [
   {
     id: 1,
     name: "John Smith",
     email: "john@company.com",
     amount: 49,
     failedAt: "2 hours ago",
-    status: "pending" as const,
+    status: "pending",
     reason: "Card expired",
     day: 1,
     tenure: "8 months",
@@ -30,7 +30,7 @@ const demoPayments = [
     email: "sarah@startup.io",
     amount: 99,
     failedAt: "5 hours ago",
-    status: "pending" as const,
+    status: "pending",
     reason: "Insufficient funds",
     day: 1,
     tenure: "2 years",
@@ -43,7 +43,7 @@ const demoPayments = [
     email: "mike@tech.co",
     amount: 29,
     failedAt: "1 day ago",
-    status: "recovered" as const,
+    status: "recovered",
     reason: "Card expired",
     day: 3,
     tenure: "3 months",

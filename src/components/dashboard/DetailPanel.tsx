@@ -172,7 +172,7 @@ export function DetailPanel({ payment, open, onOpenChange }: DetailPanelProps) {
                 </div>
                 <div>
                   <label className="text-xs text-[#5A5A6E] mb-1 block">Tone</label>
-                  <Select value={tone} onValueChange={setTone}>
+                  <Select value={tone} onValueChange={(value) => setTone(value || "friendly")}>
                     <SelectTrigger className="bg-[#0A0A0F] border-[#22222E] text-white">
                       <SelectValue />
                     </SelectTrigger>

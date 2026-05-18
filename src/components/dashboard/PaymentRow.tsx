@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Eye, Send, SkipForward } from "lucide-react";
 
-interface Payment {
+export interface Payment {
   id: number;
   name: string;
   email: string;
