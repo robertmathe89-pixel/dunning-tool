@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export function ProblemSection() {
   return (
-    <section className="py-24 bg-[#111118]">
+    <section id="problem-section" className="py-24 bg-[#111118]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Label */}
         <p className="text-xs font-semibold tracking-[0.2em] uppercase text-[#F59E0B] mb-4">

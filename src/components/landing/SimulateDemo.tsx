@@ -15,7 +15,7 @@ export function SimulateDemo() {
   const [showModal, setShowModal] = useState(false);
 
   return (
-    <section className="py-24 bg-[#0A0A0F]">
+    <section id="simulate-demo" className="py-24 bg-[#0A0A0F]">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         {/* Label */}
         <p className="text-xs font-semibold tracking-[0.2em] uppercase text-[#F59E0B] mb-4">

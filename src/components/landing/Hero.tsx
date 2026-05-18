@@ -1,9 +1,28 @@
 "use client";
 
+import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ChevronDown } from "lucide-react";
 
-export function Hero() {
+interface HeroProps {
+  onSimulate?: () => void;
+}
+
+export function Hero({ onSimulate }: HeroProps) {
+  const handleScrollToDemo = () => {
+    const demoSection = document.getElementById("simulate-demo");
+    if (demoSection) {
+      demoSection.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  const handleScrollToProblem = () => {
+    const problemSection = document.getElementById("problem-section");
+    if (problemSection) {
+      problemSection.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   return (
     <section className="relative min-h-screen flex items-center justify-center bg-[#0A0A0F] overflow-hidden">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -29,6 +48,7 @@ export function Hero() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
           <Button
             size="lg"
+            onClick={onSimulate || handleScrollToDemo}
             className="bg-[#F59E0B] hover:bg-[#D97706] text-[#0A0A0F] font-semibold px-8 py-6 text-lg rounded-full transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
           >
             Simulate a Failed Payment
@@ -37,6 +57,7 @@ export function Hero() {
           <Button
             variant="ghost"
             size="lg"
+            onClick={handleScrollToProblem}
             className="text-[#8A8A9E] hover:text-white hover:bg-[#1A1A24] px-8 py-6 text-lg rounded-full transition-all duration-200"
           >
             See how it works
