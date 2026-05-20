@@ -68,10 +68,29 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
 
   // ---------------------------------------------------------------------------
-  // On mount: check if user is already authenticated
+  // On mount: check if user is already authenticated + handle magic link hash
   // ---------------------------------------------------------------------------
   useEffect(() => {
     async function checkAuth() {
+      // First: try to process any auth tokens in the URL hash (magic link callback)
+      const hash = window.location.hash;
+      if (hash.includes('access_token=') || hash.includes('type=magiclink')) {
+        // Let Supabase process the hash — getUser forces a session refresh
+        const { data: { user: hashUser }, error: hashError } = await supabase.auth.getUser();
+        if (hashError) {
+          console.error('[ONBOARDING] Magic link hash error:', hashError.message);
+        }
+        if (hashUser) {
+          setUser(hashUser);
+          setStep(1); // Skip auth step
+          // Clean the hash from URL so it doesn't re-process on refresh
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          setCheckingAuth(false);
+          return;
+        }
+      }
+
+      // Normal session check
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUser(session.user);
@@ -80,6 +99,16 @@ export default function OnboardingPage() {
       setCheckingAuth(false);
     }
     checkAuth();
+
+    // Also listen for auth state changes (catches magic link session establishment)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        setStep(1); // Skip auth step
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [supabase]);
 
   // ---------------------------------------------------------------------------
