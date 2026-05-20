@@ -21,17 +21,20 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Send, CheckCircle, Clock } from "lucide-react";
 
 interface PaymentDetail {
-  id: number;
+  id: string;
   name: string;
   email: string;
-  amount: number;
+  amount: number; // cents
   failedAt: string;
-  status: "pending" | "recovered" | "churned";
+  status: "failed" | "dunning" | "recovered" | "abandoned" | "cancelled" | "pending";
   reason: string;
   day: number;
   tenure: string;
   totalRevenue: number;
   isDemo: boolean;
+  currency: string;
+  retryCount: number;
+  customerName?: string;
 }
 
 interface DetailPanelProps {
@@ -45,6 +48,20 @@ export function DetailPanel({ payment, open, onOpenChange }: DetailPanelProps) {
   const [tone, setTone] = useState("friendly");
 
   if (!payment) return null;
+
+  const displayStatus = payment.status === "failed" || payment.status === "dunning" || payment.status === "pending"
+    ? "pending"
+    : payment.status === "recovered"
+      ? "recovered"
+      : "churned";
+
+  const isActive = payment.status === "failed" || payment.status === "dunning" || payment.status === "pending";
+
+  const formatAmount = (cents: number, currency: string) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
+
+  const formatRevenue = (cents: number, currency: string) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
 
   const emailTimeline = [
     { day: 1, status: "sent", label: "Day 1 — Sent" },
@@ -100,7 +117,7 @@ export function DetailPanel({ payment, open, onOpenChange }: DetailPanelProps) {
                 </div>
                 <div>
                   <p className="text-[#5A5A6E]">Total revenue</p>
-                  <p className="text-white">${payment.totalRevenue}</p>
+                  <p className="text-white">{formatRevenue(payment.totalRevenue, payment.currency)}</p>
                 </div>
               </div>
             </div>
@@ -113,7 +130,7 @@ export function DetailPanel({ payment, open, onOpenChange }: DetailPanelProps) {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-[#8A8A9E]">Amount</span>
-                  <span className="text-white font-medium">${payment.amount}/mo</span>
+                  <span className="text-white font-medium">{formatAmount(payment.amount, payment.currency)}/mo</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#8A8A9E]">Reason</span>

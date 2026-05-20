@@ -1,36 +1,98 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, DollarSign, Users } from "lucide-react";
+import { TrendingUp, DollarSign, Users, Loader2 } from "lucide-react";
 
-const stats = [
-  {
-    label: "Recovery Rate",
-    value: "68%",
-    change: "↑ 12%",
-    icon: TrendingUp,
-    color: "text-[#10B981]",
-    bgColor: "bg-[#10B981]/10",
-  },
-  {
-    label: "Revenue Recovered",
-    value: "$1,247",
-    change: "this month",
-    icon: DollarSign,
-    color: "text-[#F59E0B]",
-    bgColor: "bg-[#F59E0B]/10",
-  },
-  {
-    label: "Churn Prevented",
-    value: "12",
-    change: "customers",
-    icon: Users,
-    color: "text-[#8B5CF6]",
-    bgColor: "bg-[#8B5CF6]/10",
-  },
-];
+interface AnalyticsData {
+  recoveryRate: number;
+  revenueRecovered: number;
+  churnPrevented: number;
+  totalFailed: number;
+  recoveredCount: number;
+}
 
 export function SummaryCards() {
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchAnalytics() {
+      try {
+        const res = await fetch("/api/analytics?days=30");
+        if (!res.ok) throw new Error("Failed to fetch analytics");
+        const result = await res.json();
+        setData(result.data || {
+          recoveryRate: 0,
+          revenueRecovered: 0,
+          churnPrevented: 0,
+          totalFailed: 0,
+          recoveredCount: 0,
+        });
+      } catch (err) {
+        console.error("[Dashboard] Analytics fetch failed:", err);
+        // Keep defaults on error
+        setData({
+          recoveryRate: 0,
+          revenueRecovered: 0,
+          churnPrevented: 0,
+          totalFailed: 0,
+          recoveredCount: 0,
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchAnalytics();
+  }, []);
+
+  if (loading || !data) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        {[1, 2, 3].map((i) => (
+          <Card key={i} className="bg-[#111118] border-[#22222E]">
+            <CardContent className="p-6 flex items-center justify-center h-32">
+              <Loader2 className="w-6 h-6 text-[#F59E0B] animate-spin" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  const stats = [
+    {
+      label: "Recovery Rate",
+      value: `${data.recoveryRate.toFixed(1)}%`,
+      change: data.totalFailed > 0
+        ? `${data.recoveredCount} of ${data.totalFailed} recovered`
+        : "No data yet",
+      icon: TrendingUp,
+      color: "text-[#10B981]",
+      bgColor: "bg-[#10B981]/10",
+    },
+    {
+      label: "Revenue Recovered",
+      value: new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      }).format(data.revenueRecovered / 100),
+      change: "last 30 days",
+      icon: DollarSign,
+      color: "text-[#F59E0B]",
+      bgColor: "bg-[#F59E0B]/10",
+    },
+    {
+      label: "Churn Prevented",
+      value: String(data.churnPrevented),
+      change: "customers",
+      icon: Users,
+      color: "text-[#8B5CF6]",
+      bgColor: "bg-[#8B5CF6]/10",
+    },
+  ];
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
       {stats.map((stat) => (

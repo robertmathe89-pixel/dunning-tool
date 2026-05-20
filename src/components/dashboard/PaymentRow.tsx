@@ -5,41 +5,60 @@ import { Badge } from "@/components/ui/badge";
 import { Eye, Send, SkipForward } from "lucide-react";
 
 export interface Payment {
-  id: number;
+  id: string;
   name: string;
   email: string;
-  amount: number;
-  failedAt: string;
-  status: "pending" | "recovered" | "churned";
+  amount: number; // cents
+  failedAt: string; // ISO date string
+  status: "failed" | "dunning" | "recovered" | "abandoned" | "cancelled" | "pending";
   reason: string;
   day: number;
   tenure: string;
-  totalRevenue: number;
+  totalRevenue: number; // cents
   isDemo: boolean;
+  currency: string;
+  retryCount: number;
+  customerName?: string;
 }
 
 interface PaymentRowProps {
   payment: Payment;
   onSelect: (payment: Payment) => void;
+  formatFailedAt: (dateStr: string) => string;
+  formatAmount: (cents: number, currency: string) => string;
 }
 
-export function PaymentRow({ payment, onSelect }: PaymentRowProps) {
-  const statusColors = {
+export function PaymentRow({ payment, onSelect, formatFailedAt, formatAmount }: PaymentRowProps) {
+  const statusColors: Record<string, string> = {
+    failed: "bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/20",
+    dunning: "bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/20",
     pending: "bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/20",
     recovered: "bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20",
-    churned: "bg-[#EF4444]/10 text-[#EF4444] border-[#EF4444]/20",
+    abandoned: "bg-[#EF4444]/10 text-[#EF4444] border-[#EF4444]/20",
+    cancelled: "bg-[#EF4444]/10 text-[#EF4444] border-[#EF4444]/20",
   };
 
-  const leftBorderColor = {
+  const leftBorderColor: Record<string, string> = {
+    failed: "border-l-[#F59E0B]",
+    dunning: "border-l-[#F59E0B]",
     pending: "border-l-[#F59E0B]",
     recovered: "border-l-[#10B981]",
-    churned: "border-l-[#EF4444]",
+    abandoned: "border-l-[#EF4444]",
+    cancelled: "border-l-[#EF4444]",
   };
+
+  const displayStatus = payment.status === "failed" || payment.status === "dunning" || payment.status === "pending" 
+    ? "pending" 
+    : payment.status === "recovered" 
+      ? "recovered" 
+      : "churned";
+
+  const isActive = payment.status === "failed" || payment.status === "dunning" || payment.status === "pending";
 
   return (
     <div
       onClick={() => onSelect(payment)}
-      className={`border-b border-[#22222E] last:border-0 border-l-2 ${leftBorderColor[payment.status]} hover:bg-[#1A1A24]/50 transition-colors duration-200 cursor-pointer`}
+      className={`border-b border-[#22222E] last:border-0 border-l-2 ${leftBorderColor[payment.status] || "border-l-[#5A5A6E]"} hover:bg-[#1A1A24]/50 transition-colors duration-200 cursor-pointer`}
     >
       {/* Desktop Table Row */}
       <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-4 items-center">
@@ -48,7 +67,7 @@ export function PaymentRow({ payment, onSelect }: PaymentRowProps) {
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-[#F59E0B]/10 flex items-center justify-center flex-shrink-0">
               <span className="text-sm font-medium text-[#F59E0B]">
-                {payment.name[0]}
+                {payment.name?.[0] || "?"}
               </span>
             </div>
             <div className="min-w-0">
@@ -70,13 +89,13 @@ export function PaymentRow({ payment, onSelect }: PaymentRowProps) {
 
         {/* Amount */}
         <div className="col-span-2">
-          <p className="text-sm text-white font-medium">${payment.amount}/mo</p>
+          <p className="text-sm text-white font-medium">{formatAmount(payment.amount, payment.currency)}/mo</p>
           <p className="text-xs text-[#5A5A6E]">{payment.reason}</p>
         </div>
 
         {/* Failed */}
         <div className="col-span-2">
-          <p className="text-sm text-[#8A8A9E]">{payment.failedAt}</p>
+          <p className="text-sm text-[#8A8A9E]">{formatFailedAt(payment.failedAt)}</p>
           <p className="text-xs text-[#5A5A6E]">Day {payment.day} of 4</p>
         </div>
 
@@ -84,15 +103,15 @@ export function PaymentRow({ payment, onSelect }: PaymentRowProps) {
         <div className="col-span-2">
           <Badge
             variant="outline"
-            className={`${statusColors[payment.status]} text-xs capitalize`}
+            className={`${statusColors[payment.status] || statusColors.pending} text-xs capitalize`}
           >
-            {payment.status}
+            {displayStatus}
           </Badge>
         </div>
 
         {/* Actions */}
         <div className="col-span-2 lg:col-span-3 flex items-center justify-end gap-1">
-          {payment.status === "pending" && (
+          {isActive && (
             <>
               <Button
                 variant="ghost"
@@ -120,7 +139,7 @@ export function PaymentRow({ payment, onSelect }: PaymentRowProps) {
           {payment.status === "recovered" && (
             <span className="text-xs text-[#10B981]">Card updated</span>
           )}
-          {payment.status === "churned" && (
+          {(payment.status === "abandoned" || payment.status === "cancelled") && (
             <span className="text-xs text-[#EF4444]">Account closed</span>
           )}
         </div>
@@ -134,7 +153,7 @@ export function PaymentRow({ payment, onSelect }: PaymentRowProps) {
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-full bg-[#F59E0B]/10 flex items-center justify-center flex-shrink-0">
                 <span className="text-sm font-medium text-[#F59E0B]">
-                  {payment.name[0]}
+                  {payment.name?.[0] || "?"}
                 </span>
               </div>
               <div className="min-w-0">
@@ -155,9 +174,9 @@ export function PaymentRow({ payment, onSelect }: PaymentRowProps) {
               )}
               <Badge
                 variant="outline"
-                className={`${statusColors[payment.status]} text-xs capitalize`}
+                className={`${statusColors[payment.status] || statusColors.pending} text-xs capitalize`}
               >
-                {payment.status}
+                {displayStatus}
               </Badge>
             </div>
           </div>
@@ -165,18 +184,18 @@ export function PaymentRow({ payment, onSelect }: PaymentRowProps) {
           {/* Details row */}
           <div className="flex items-center justify-between text-sm">
             <div>
-              <p className="text-white font-medium">${payment.amount}/mo</p>
+              <p className="text-white font-medium">{formatAmount(payment.amount, payment.currency)}/mo</p>
               <p className="text-xs text-[#5A5A6E]">{payment.reason}</p>
             </div>
             <div className="text-right">
-              <p className="text-[#8A8A9E]">{payment.failedAt}</p>
+              <p className="text-[#8A8A9E]">{formatFailedAt(payment.failedAt)}</p>
               <p className="text-xs text-[#5A5A6E]">Day {payment.day} of 4</p>
             </div>
           </div>
 
           {/* Actions row */}
           <div className="flex items-center justify-end gap-2 pt-1">
-            {payment.status === "pending" && (
+            {isActive && (
               <>
                 <Button
                   variant="ghost"
@@ -207,7 +226,7 @@ export function PaymentRow({ payment, onSelect }: PaymentRowProps) {
             {payment.status === "recovered" && (
               <span className="text-xs text-[#10B981]">Card updated</span>
             )}
-            {payment.status === "churned" && (
+            {(payment.status === "abandoned" || payment.status === "cancelled") && (
               <span className="text-xs text-[#EF4444]">Account closed</span>
             )}
           </div>
