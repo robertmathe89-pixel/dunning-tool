@@ -133,7 +133,14 @@ export default function OnboardingPage() {
 
     if (error) {
       console.error("[ONBOARDING] Magic link error:", error);
-      setAuthError(error.message);
+      // Handle rate limit gracefully
+      if (error.message?.toLowerCase().includes("rate limit")) {
+        setAuthError(
+          "Rate limit reached — you already have a magic link in your email. Check your inbox (and spam folder). If you can't find it, wait a few minutes and try again."
+        );
+      } else {
+        setAuthError(error.message);
+      }
       setAuthStatus("error");
     } else {
       setAuthStatus("sent");
