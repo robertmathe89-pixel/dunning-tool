@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createRouteClient, getUserIdFromRequest } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import Stripe from "stripe";
 
@@ -43,24 +43,31 @@ export async function POST(request: Request) {
     }
 
     // Key is valid — persist it (upsert into user_settings)
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const { supabase, applyCookies } = await createRouteClient();
+    const { userId, response: cachedResponse } = await getUserIdFromRequest(
+      request,
+      supabase,
+      applyCookies
+    );
 
-    if (authError || !user) {
-      return NextResponse.json(
+    if (!userId) {
+      const response = NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
+      if (cachedResponse) {
+        cachedResponse.cookies.getAll().forEach((cookie: any) => {
+          response.cookies.set(cookie.name, cookie.value, cookie);
+        });
+      }
+      return response;
     }
 
     const { error: upsertError } = await supabaseAdmin
       .from("user_settings")
       .upsert(
         {
-          user_id: user.id,
+          user_id: userId,
           stripe_secret_key: apiKey,
           stripe_key_valid: true,
           updated_at: new Date().toISOString(),
@@ -70,13 +77,15 @@ export async function POST(request: Request) {
 
     if (upsertError) {
       console.error("[API] Failed to save Stripe key:", upsertError);
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: "Database error", details: upsertError.message },
         { status: 500 }
       );
+      applyCookies(response);
+      return response;
     }
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         valid: true,
         accountId: account.id,
@@ -85,6 +94,8 @@ export async function POST(request: Request) {
       },
       { status: 200 }
     );
+    applyCookies(response);
+    return response;
   } catch (err: any) {
     console.error("[API] POST /stripe/validate uncaught error:", err);
     return NextResponse.json(

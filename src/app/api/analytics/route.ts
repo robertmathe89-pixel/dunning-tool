@@ -1,13 +1,4 @@
 import { NextResponse } from "next/server";
-import { createRouteClient } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
-
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const days = parseInt(searchParams.get("days") || "30", 10);
-
-import { NextResponse } from "next/server";
 import { createRouteClient, getUserIdFromRequest } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -26,7 +17,7 @@ export async function GET(request: Request) {
       const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       if (cachedResponse) {
         // Copy any refreshed cookies from the cached response
-        cachedResponse.cookies.getAll().forEach((cookie) => {
+        cachedResponse.cookies.getAll().forEach((cookie: any) => {
           response.cookies.set(cookie.name, cookie.value, cookie);
         });
       }
@@ -51,7 +42,7 @@ export async function GET(request: Request) {
     }
 
     const totalFailed = allPayments?.length ?? 0;
-    const recoveredCount = allPayments?.filter((p) => p.status === "recovered").length ?? 0;
+    const recoveredCount = allPayments?.filter((p: any) => p.status === "recovered").length ?? 0;
     const recoveryRate = totalFailed > 0 ? (recoveredCount / totalFailed) * 100 : 0;
 
     // Revenue recovered
@@ -67,7 +58,7 @@ export async function GET(request: Request) {
     }
 
     const revenueRecovered =
-      recoveredPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) ?? 0;
+      recoveredPayments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) ?? 0;
 
     // Churn prevented = recovered count (each recovered = churn prevented)
     const churnPrevented = recoveredCount;

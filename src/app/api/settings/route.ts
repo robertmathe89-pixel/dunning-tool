@@ -1,43 +1,51 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createRouteClient, getUserIdFromRequest } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
+    const { supabase, applyCookies } = await createRouteClient();
+    const { userId, response: cachedResponse } = await getUserIdFromRequest(
+      request,
+      supabase,
+      applyCookies
+    );
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
+    if (!userId) {
+      const response = NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
+      if (cachedResponse) {
+        cachedResponse.cookies.getAll().forEach((cookie: any) => {
+          response.cookies.set(cookie.name, cookie.value, cookie);
+        });
+      }
+      return response;
     }
 
     const { data, error } = await supabase
       .from("user_settings")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle();
 
     if (error) {
       console.error("[API] GET /settings error:", error);
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: "Database error", details: error.message },
         { status: 500 }
       );
+      applyCookies(response);
+      return response;
     }
 
     if (!data) {
       // Return defaults if no settings row exists yet
-      return NextResponse.json(
+      const response = NextResponse.json(
         {
           data: {
-            user_id: user.id,
+            user_id: userId,
             stripe_key_valid: false,
             recovery_email_from: null,
             recovery_email_reply_to: null,
@@ -50,12 +58,16 @@ export async function GET(request: Request) {
         },
         { status: 200 }
       );
+      applyCookies(response);
+      return response;
     }
 
     // Strip sensitive fields from the response
     const { stripe_secret_key, stripe_webhook_secret, ...safeData } = data;
 
-    return NextResponse.json({ data: safeData }, { status: 200 });
+    const response = NextResponse.json({ data: safeData }, { status: 200 });
+    applyCookies(response);
+    return response;
   } catch (err: any) {
     console.error("[API] GET /settings uncaught error:", err);
     return NextResponse.json(
@@ -77,18 +89,24 @@ export async function PATCH(request: Request) {
   try {
     const body = await request.json();
 
-    const supabase = await createClient();
+    const { supabase, applyCookies } = await createRouteClient();
+    const { userId, response: cachedResponse } = await getUserIdFromRequest(
+      request,
+      supabase,
+      applyCookies
+    );
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
+    if (!userId) {
+      const response = NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
+      if (cachedResponse) {
+        cachedResponse.cookies.getAll().forEach((cookie: any) => {
+          response.cookies.set(cookie.name, cookie.value, cookie);
+        });
+      }
+      return response;
     }
 
     // Build updates from allowed keys only
@@ -113,7 +131,7 @@ export async function PATCH(request: Request) {
       .from("user_settings")
       .upsert(
         {
-          user_id: user.id,
+          user_id: userId,
           ...updates,
         },
         { onConflict: "user_id" }
@@ -123,16 +141,20 @@ export async function PATCH(request: Request) {
 
     if (error) {
       console.error("[API] PATCH /settings error:", error);
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: "Database error", details: error.message },
         { status: 500 }
       );
+      applyCookies(response);
+      return response;
     }
 
     // Strip sensitive fields from response
     const { stripe_secret_key, stripe_webhook_secret, ...safeData } = data;
 
-    return NextResponse.json({ data: safeData }, { status: 200 });
+    const response = NextResponse.json({ data: safeData }, { status: 200 });
+    applyCookies(response);
+    return response;
   } catch (err: any) {
     console.error("[API] PATCH /settings uncaught error:", err);
     return NextResponse.json(
