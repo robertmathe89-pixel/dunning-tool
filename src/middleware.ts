@@ -1,22 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
-// Paths that require an active session
 const PROTECTED_PATHS = ["/dashboard"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isProtected = PROTECTED_PATHS.some((prefix) =>
-    pathname.startsWith(prefix)
-  );
-
-  if (!isProtected) {
-    // Public route — don't make auth API calls to avoid rate limits
-    return NextResponse.next();
-  }
-
-  // Protected route — validate session and refresh cookies
+  // Start with a response we can attach cookies to
   let response = NextResponse.next({
     request: { headers: request.headers },
   });
@@ -47,10 +37,23 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Validate session (may refresh token)
-  const { data: { user }, error } = await supabase.auth.getUser();
+  // Refresh session if needed (reads cookies, only networks if token expired)
+  // This is the official Supabase pattern for middleware
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  if (error || !user) {
+  const isProtected = PROTECTED_PATHS.some((prefix) =>
+    pathname.startsWith(prefix)
+  );
+
+  if (!isProtected) {
+    // Public route — allow through, but cookies are refreshed if needed
+    return response;
+  }
+
+  // Protected route — validate the session
+  if (!session?.user) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 

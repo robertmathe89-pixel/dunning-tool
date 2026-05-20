@@ -14,23 +14,25 @@ export default function DashboardLayout({
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
 
   useEffect(() => {
-    // Skip if we already fetched this browser tab session
-    if (sessionStorage.getItem("dt_layout_fetched") === "1") {
-      return;
-    }
-    sessionStorage.setItem("dt_layout_fetched", "1");
+    const supabase = createClient();
 
-    async function getUser() {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUserEmail(user?.email || null);
-    }
-    getUser();
-  }, [supabase]);
+    // Get initial user from the active session (no network call if session is in memory)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserEmail(session?.user?.email || null);
+    });
+
+    // Listen for auth state changes (single listener, no repeated network calls)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUserEmail(session?.user?.email || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleLogout = async () => {
+    const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/");
   };
