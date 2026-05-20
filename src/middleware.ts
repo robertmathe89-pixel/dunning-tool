@@ -13,7 +13,10 @@ import { updateSession } from "@/lib/supabase/middleware";
  */
 
 // Paths that require an active session
-const PROTECTED_PATHS = ["/dashboard", "/onboarding"];
+const PROTECTED_PATHS = ["/dashboard"];
+
+// Paths that redirect authenticated users away (e.g. login page)
+const AUTH_ONLY_PATHS = ["/login"];
 
 // Paths that anonymous users are allowed to access
 const PUBLIC_PATHS = ["/", "/login", "/auth", "/api/webhook"];
