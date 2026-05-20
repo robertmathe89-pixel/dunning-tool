@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createRouteClient } from "@/lib/supabase/server";
+import { createRouteClient, getUserIdFromRequest } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   try {
@@ -10,17 +10,17 @@ export async function GET(request: Request) {
     // Create Supabase client with cookie refresh support
     const { supabase, applyCookies } = await createRouteClient();
 
-    // Refresh session
-    const {
-      data: { session },
-      error: authError,
-    } = await supabase.auth.getSession();
+    // Use cached session check to avoid rate limit races with concurrent API calls
+    const { userId, response: cachedResponse } = await getUserIdFromRequest(request, supabase, applyCookies);
 
-    const user = session?.user ?? null;
-
-    if (authError || !user) {
+    if (!userId) {
       const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      applyCookies(response);
+      if (cachedResponse) {
+        // Copy any refreshed cookies from the cached response
+        cachedResponse.cookies.getAll().forEach((cookie) => {
+          response.cookies.set(cookie.name, cookie.value, cookie);
+        });
+      }
       return response;
     }
 
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from("failed_payments")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(limit);
 

@@ -7,20 +7,29 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get("days") || "30", 10);
 
+import { NextResponse } from "next/server";
+import { createRouteClient, getUserIdFromRequest } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const days = parseInt(searchParams.get("days") || "30", 10);
+
     // Create Supabase client with cookie refresh support
     const { supabase, applyCookies } = await createRouteClient();
 
-    // Refresh session
-    const {
-      data: { session },
-      error: authError,
-    } = await supabase.auth.getSession();
+    // Use cached session check to avoid rate limit races with concurrent API calls
+    const { userId, response: cachedResponse } = await getUserIdFromRequest(request, supabase, applyCookies);
 
-    const user = session?.user ?? null;
-
-    if (authError || !user) {
+    if (!userId) {
       const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      applyCookies(response);
+      if (cachedResponse) {
+        // Copy any refreshed cookies from the cached response
+        cachedResponse.cookies.getAll().forEach((cookie) => {
+          response.cookies.set(cookie.name, cookie.value, cookie);
+        });
+      }
       return response;
     }
 
@@ -28,7 +37,7 @@ export async function GET(request: Request) {
     const { data: allPayments, error: allError } = await supabaseAdmin
       .from("failed_payments")
       .select("status")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .gte("created_at", new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
 
     if (allError) {
@@ -49,7 +58,7 @@ export async function GET(request: Request) {
     const { data: recoveredPayments, error: revError } = await supabaseAdmin
       .from("failed_payments")
       .select("amount")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("status", "recovered")
       .gte("created_at", new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
 
