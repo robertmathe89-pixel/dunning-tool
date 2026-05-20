@@ -74,6 +74,14 @@ export default function OnboardingPage() {
   // On mount: if already authenticated, redirect to dashboard immediately
   // ---------------------------------------------------------------------------
   useEffect(() => {
+    // Skip auth check if we already checked this browser tab session
+    // (sessionStorage survives navigation but not new tabs)
+    if (sessionStorage.getItem("dt_onboarding_checked") === "1") {
+      setCheckingAuth(false);
+      return;
+    }
+    sessionStorage.setItem("dt_onboarding_checked", "1");
+
     async function checkAuth() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {

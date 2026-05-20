@@ -17,6 +17,12 @@ export default function DashboardLayout({
   const supabase = createClient();
 
   useEffect(() => {
+    // Skip if we already fetched this browser tab session
+    if (sessionStorage.getItem("dt_layout_fetched") === "1") {
+      return;
+    }
+    sessionStorage.setItem("dt_layout_fetched", "1");
+
     async function getUser() {
       const { data: { user } } = await supabase.auth.getUser();
       setUserEmail(user?.email || null);
