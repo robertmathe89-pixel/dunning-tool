@@ -23,14 +23,14 @@ import {
   ArrowLeft,
   Send,
   User,
+  Lock,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-// Steps:
-// 0 = Auth (email + magic link)
-// 1 = Stripe
-// 2 = Email SMTP
-// 3 = Simulate / Preview
+// Steps display: 1-4 (auth is always step 1 visually, but we skip if already logged in)
+// Internal step: 0=auth, 1=stripe, 2=email, 3=preview
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -40,14 +40,17 @@ export default function OnboardingPage() {
   const [user, setUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
-  // Wizard step (0-indexed, display shows +1)
+  // Wizard step (0-indexed)
   const [step, setStep] = useState(0);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
 
-  // Step 0: Auth
+  // Step 0: Auth (email + password)
   const [authEmail, setAuthEmail] = useState("");
-  const [authStatus, setAuthStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [authPassword, setAuthPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [authStatus, setAuthStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [authError, setAuthError] = useState("");
+  const [isExistingUser, setIsExistingUser] = useState(false);
 
   // Step 1: Stripe
   const [stripeKey, setStripeKey] = useState("");
@@ -68,107 +71,113 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
 
   // ---------------------------------------------------------------------------
-  // On mount: handle PKCE code exchange + check auth state
+  // On mount: check if user is already authenticated
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    async function handleAuth() {
-      // 1. Handle PKCE code exchange from magic link redirect
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
-      const errorParam = params.get('error');
-      
-      if (errorParam) {
-        console.error('[ONBOARDING] Auth error from redirect:', errorParam);
-        setAuthError(`Authentication failed: ${errorParam}. Try sending a new magic link.`);
-        setCheckingAuth(false);
-        // Clean URL
-        window.history.replaceState(null, '', window.location.pathname);
-        return;
-      }
-
-      if (code) {
-        console.log('[ONBOARDING] Exchanging PKCE code for session...');
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-        if (exchangeError) {
-          console.error('[ONBOARDING] Code exchange failed:', exchangeError);
-          setAuthError('Session verification failed. Please try again.');
-        }
-        // Remove code from URL regardless of success/failure
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-
-      // 2. Check for hash-based tokens (fallback)
-      const hash = window.location.hash;
-      if (hash.includes('access_token=') || hash.includes('type=magiclink')) {
-        const { data: { user: hashUser }, error: hashError } = await supabase.auth.getUser();
-        if (hashError) {
-          console.error('[ONBOARDING] Hash auth error:', hashError);
-        }
-        if (hashUser) {
-          setUser(hashUser);
-          setStep(1);
-          window.history.replaceState(null, '', window.location.pathname + window.location.search);
-          setCheckingAuth(false);
-          return;
-        }
-      }
-
-      // 3. Normal session check
+    async function checkAuth() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUser(session.user);
-        setStep(1);
+        setStep(1); // Skip auth step
       }
       setCheckingAuth(false);
     }
-
-    handleAuth();
-
-    // Also listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[ONBOARDING] Auth state change:', event);
-      if (session?.user) {
-        setUser(session.user);
-        setStep(1);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    checkAuth();
   }, [supabase]);
 
   // ---------------------------------------------------------------------------
-  // Step 0: Send magic link
+  // Step 0: Email + Password Auth
   // ---------------------------------------------------------------------------
-  const sendMagicLink = async () => {
+  const handleAuth = async () => {
+    // Validation
     if (!authEmail || !authEmail.includes("@")) {
       setAuthError("Please enter a valid email address.");
       setAuthStatus("error");
       return;
     }
+    if (!authPassword || authPassword.length < 6) {
+      setAuthError("Password must be at least 6 characters.");
+      setAuthStatus("error");
+      return;
+    }
 
-    setAuthStatus("sending");
+    setAuthStatus("submitting");
     setAuthError("");
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email: authEmail,
-      options: {
-        emailRedirectTo: `${window.location.origin}/onboarding`,
-      },
-    });
+    const mode = isExistingUser ? "signin" : "signup";
 
-    if (error) {
-      console.error("[ONBOARDING] Magic link error:", error);
-      // Handle rate limit gracefully
-      if (error.message?.toLowerCase().includes("rate limit")) {
-        setAuthError(
-          "Rate limit reached — you already have a magic link in your email. Check your inbox (and spam folder). If you can't find it, wait a few minutes and try again."
-        );
-      } else {
-        setAuthError(error.message);
+    if (mode === "signup") {
+      // Try to create account
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: authEmail,
+        password: authPassword,
+      });
+
+      if (signUpError) {
+        const msg = signUpError.message.toLowerCase();
+        // If user already exists, switch to sign-in mode
+        if (msg.includes("already registered") || msg.includes("already exists") || msg.includes("user already")) {
+          setIsExistingUser(true);
+          setAuthError("Account already exists. Please sign in with your password.");
+          setAuthStatus("error");
+          return;
+        }
+        setAuthError(signUpError.message);
+        setAuthStatus("error");
+        return;
       }
-      setAuthStatus("error");
+
+      // Success — signUp may or may not return a session depending on Supabase config
+      if (signUpData.session) {
+        setUser(signUpData.user);
+        setAuthStatus("success");
+        setTimeout(() => setStep(1), 600);
+        return;
+      }
+
+      // No session yet (email confirmation may be enabled) — try to sign in
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: authEmail,
+        password: authPassword,
+      });
+
+      if (signInData.session) {
+        setUser(signInData.user);
+        setAuthStatus("success");
+        setTimeout(() => setStep(1), 600);
+        return;
+      }
+
+      if (signInError) {
+        setAuthError(
+          "Account created but email confirmation may be required. " +
+          "Tip: Disable 'Confirm email' in Supabase Auth → Email settings for instant access."
+        );
+        setAuthStatus("error");
+        return;
+      }
     } else {
-      setAuthStatus("sent");
+      // Sign in existing user
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: authEmail,
+        password: authPassword,
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        setAuthStatus("error");
+        return;
+      }
+
+      if (!data.session) {
+        setAuthError("Sign-in failed. Please check your credentials.");
+        setAuthStatus("error");
+        return;
+      }
+
+      setUser(data.user);
+      setAuthStatus("success");
+      setTimeout(() => setStep(1), 600);
     }
   };
 
@@ -303,8 +312,8 @@ export default function OnboardingPage() {
   // ---------------------------------------------------------------------------
   // Wizard display step (1-4 for progress bar, internal is 0-3)
   // ---------------------------------------------------------------------------
-  const displayStep = step + (user ? 1 : 0); // if user exists, step 0 is hidden
-  const totalSteps = user ? 3 : 4;
+  const displayStep = step + 1; // always show at least 1
+  const totalSteps = 4;
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] flex items-center justify-center p-4">
@@ -314,7 +323,7 @@ export default function OnboardingPage() {
           <ProgressIndicator currentStep={displayStep} totalSteps={totalSteps} />
 
           {/* =====================================================================
-              STEP 0: AUTH (only shown if not authenticated)
+              STEP 0: AUTH (Email + Password)
              ===================================================================== */}
           {step === 0 && !user && (
             <div className="space-y-6 animate-fade-in-up">
@@ -323,81 +332,112 @@ export default function OnboardingPage() {
                   <User className="w-8 h-8 text-[#F59E0B]" />
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-2">
-                  Let&apos;s get you set up
+                  {isExistingUser ? "Welcome back" : "Let's get you set up"}
                 </h2>
                 <p className="text-[#8A8A9E]">
-                  Enter your email and we&apos;ll send you a magic link to sign in. No password needed.
+                  {isExistingUser
+                    ? "Sign in with your email and password."
+                    : "Create your account. No password resets, no magic links — just a simple password."}
                 </p>
               </div>
 
               <div className="space-y-4">
-                {authStatus !== "sent" ? (
-                  <>
-                    <div>
-                      <label className="text-sm text-[#8A8A9E] mb-2 block">
-                        Your Email
-                      </label>
-                      <Input
-                        type="email"
-                        placeholder="founder@yourcompany.com"
-                        value={authEmail}
-                        onChange={(e) => {
-                          setAuthEmail(e.target.value);
-                          if (authStatus === "error") setAuthStatus("idle");
-                        }}
-                        className="bg-[#0A0A0F] border-[#22222E] text-white placeholder:text-[#5A5A6E]"
-                      />
-                    </div>
+                <div>
+                  <label className="text-sm text-[#8A8A9E] mb-2 block">
+                    Email
+                  </label>
+                  <Input
+                    type="email"
+                    placeholder="founder@yourcompany.com"
+                    value={authEmail}
+                    onChange={(e) => {
+                      setAuthEmail(e.target.value);
+                      if (authStatus === "error") setAuthStatus("idle");
+                    }}
+                    className="bg-[#0A0A0F] border-[#22222E] text-white placeholder:text-[#5A5A6E]"
+                  />
+                </div>
 
-                    <Button
-                      onClick={sendMagicLink}
-                      disabled={!authEmail || authStatus === "sending"}
-                      className="w-full bg-[#F59E0B] hover:bg-[#D97706] text-[#0A0A0F] font-semibold py-6 transition-all duration-200"
+                <div>
+                  <label className="text-sm text-[#8A8A9E] mb-2 block">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={authPassword}
+                      onChange={(e) => {
+                        setAuthPassword(e.target.value);
+                        if (authStatus === "error") setAuthStatus("idle");
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAuth();
+                      }}
+                      className="bg-[#0A0A0F] border-[#22222E] text-white placeholder:text-[#5A5A6E] pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5A5A6E] hover:text-[#8A8A9E]"
                     >
-                      {authStatus === "sending" ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Sending...
-                        </>
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4" />
                       ) : (
-                        <>
-                          <Mail className="w-4 h-4 mr-2" />
-                          Send Magic Link
-                        </>
+                        <Eye className="w-4 h-4" />
                       )}
-                    </Button>
+                    </button>
+                  </div>
+                  <p className="text-xs text-[#5A5A6E] mt-1">
+                    Minimum 6 characters
+                  </p>
+                </div>
 
-                    {authStatus === "error" && authError && (
-                      <div className="flex items-center gap-2 text-[#EF4444] justify-center text-sm">
-                        <AlertCircle className="w-4 h-4" />
-                        <span>{authError}</span>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-center space-y-4">
-                    <div className="w-16 h-16 rounded-full bg-[#10B981]/10 flex items-center justify-center mx-auto">
-                      <Check className="w-8 h-8 text-[#10B981]" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-white">
-                      Check your email
-                    </h3>
-                    <p className="text-[#8A8A9E]">
-                      We sent a magic link to <strong className="text-white">{authEmail}</strong>.<br />
-                      Click the link in the email to continue.
-                    </p>
-                    <p className="text-xs text-[#5A5A6E]">
-                      Didn&apos;t receive it? Check your spam folder or{" "}
-                      <button
-                        onClick={() => setAuthStatus("idle")}
-                        className="text-[#F59E0B] hover:underline"
-                      >
-                        try again
-                      </button>
-                      .
-                    </p>
+                <Button
+                  onClick={handleAuth}
+                  disabled={!authEmail || !authPassword || authStatus === "submitting"}
+                  className="w-full bg-[#F59E0B] hover:bg-[#D97706] text-[#0A0A0F] font-semibold py-6 transition-all duration-200"
+                >
+                  {authStatus === "submitting" ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {isExistingUser ? "Signing in..." : "Creating account..."}
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4 mr-2" />
+                      {isExistingUser ? "Sign In" : "Create Account"}
+                    </>
+                  )}
+                </Button>
+
+                {authStatus === "success" && (
+                  <div className="flex items-center gap-2 text-[#10B981] justify-center">
+                    <Check className="w-5 h-5" />
+                    <span>Account ready!</span>
                   </div>
                 )}
+                {authStatus === "error" && authError && (
+                  <div className="flex items-center gap-2 text-[#EF4444] justify-center text-sm text-center">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{authError}</span>
+                  </div>
+                )}
+
+                <div className="text-center">
+                  <button
+                    onClick={() => {
+                      setIsExistingUser(!isExistingUser);
+                      setAuthStatus("idle");
+                      setAuthError("");
+                    }}
+                    className="text-sm text-[#5A5A6E] hover:text-[#F59E0B] transition-colors"
+                  >
+                    {isExistingUser
+                      ? "Don't have an account? Create one"
+                      : "Already have an account? Sign in"}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -678,7 +718,7 @@ export default function OnboardingPage() {
                   <Sparkles className="w-8 h-8 text-[#F59E0B]" />
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-2">
-                  You&apos;re all set!
+                  You're all set!
                 </h2>
                 <p className="text-[#8A8A9E]">
                   See exactly what your customers will experience when a payment fails.
@@ -752,16 +792,16 @@ export default function OnboardingPage() {
               <div className="space-y-3 text-sm text-[#8A8A9E]">
                 <p className="text-white">Hi John,</p>
                 <p>
-                  Looks like your payment for {companyName || "HerStartup"} didn&apos;t go through. No worries — this happens to all of us.
+                  Looks like your payment for {companyName || "HerStartup"} didn't go through. No worries — this happens to all of us.
                 </p>
                 <p>
-                  Most of the time it&apos;s just an expired card or a temporary hold from your bank.
+                  Most of the time it's just an expired card or a temporary hold from your bank.
                 </p>
                 <Button className="bg-[#F59E0B] hover:bg-[#D97706] text-[#0A0A0F] font-semibold my-2">
                   Update Payment Method
                 </Button>
                 <p>
-                  If you&apos;re having trouble, just reply to this email and I&apos;ll help sort it out.
+                  If you're having trouble, just reply to this email and I'll help sort it out.
                 </p>
                 <div className="pt-2">
                   <p className="text-white">Best,</p>
