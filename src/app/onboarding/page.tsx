@@ -68,43 +68,68 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
 
   // ---------------------------------------------------------------------------
-  // On mount: check if user is already authenticated + handle magic link hash
+  // On mount: handle PKCE code exchange + check auth state
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    async function checkAuth() {
-      // First: try to process any auth tokens in the URL hash (magic link callback)
+    async function handleAuth() {
+      // 1. Handle PKCE code exchange from magic link redirect
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const errorParam = params.get('error');
+      
+      if (errorParam) {
+        console.error('[ONBOARDING] Auth error from redirect:', errorParam);
+        setAuthError(`Authentication failed: ${errorParam}. Try sending a new magic link.`);
+        setCheckingAuth(false);
+        // Clean URL
+        window.history.replaceState(null, '', window.location.pathname);
+        return;
+      }
+
+      if (code) {
+        console.log('[ONBOARDING] Exchanging PKCE code for session...');
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) {
+          console.error('[ONBOARDING] Code exchange failed:', exchangeError);
+          setAuthError('Session verification failed. Please try again.');
+        }
+        // Remove code from URL regardless of success/failure
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+
+      // 2. Check for hash-based tokens (fallback)
       const hash = window.location.hash;
       if (hash.includes('access_token=') || hash.includes('type=magiclink')) {
-        // Let Supabase process the hash — getUser forces a session refresh
         const { data: { user: hashUser }, error: hashError } = await supabase.auth.getUser();
         if (hashError) {
-          console.error('[ONBOARDING] Magic link hash error:', hashError.message);
+          console.error('[ONBOARDING] Hash auth error:', hashError);
         }
         if (hashUser) {
           setUser(hashUser);
-          setStep(1); // Skip auth step
-          // Clean the hash from URL so it doesn't re-process on refresh
+          setStep(1);
           window.history.replaceState(null, '', window.location.pathname + window.location.search);
           setCheckingAuth(false);
           return;
         }
       }
 
-      // Normal session check
+      // 3. Normal session check
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUser(session.user);
-        setStep(1); // Skip auth step
+        setStep(1);
       }
       setCheckingAuth(false);
     }
-    checkAuth();
 
-    // Also listen for auth state changes (catches magic link session establishment)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    handleAuth();
+
+    // Also listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[ONBOARDING] Auth state change:', event);
       if (session?.user) {
         setUser(session.user);
-        setStep(1); // Skip auth step
+        setStep(1);
       }
     });
 
