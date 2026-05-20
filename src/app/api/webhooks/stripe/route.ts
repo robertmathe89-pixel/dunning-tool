@@ -3,11 +3,21 @@ import { headers } from "next/headers";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-04-30.basil",
-});
+const getStripe = () => {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    throw new Error("STRIPE_SECRET_KEY is not configured");
+  }
+  return new Stripe(key);
+};
 
-const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
+const getWebhookSecret = () => {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!secret) {
+    throw new Error("STRIPE_WEBHOOK_SECRET is not configured");
+  }
+  return secret;
+};
 
 export async function POST(request: Request) {
   const body = await request.text();
@@ -24,7 +34,7 @@ export async function POST(request: Request) {
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(body, signature, WEBHOOK_SECRET);
+    event = getStripe().webhooks.constructEvent(body, signature, getWebhookSecret());
   } catch (err: any) {
     console.error("[STRIPE] Signature verification failed:", err.message);
     return NextResponse.json(
@@ -35,7 +45,7 @@ export async function POST(request: Request) {
 
   try {
     if (event.type === "invoice.payment_failed") {
-      const invoice = event.data.object as Stripe.Invoice;
+      const invoice = event.data.object as any;
       const paymentIntentId =
         typeof invoice.payment_intent === "string"
           ? invoice.payment_intent

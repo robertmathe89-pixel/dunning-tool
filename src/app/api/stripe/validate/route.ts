@@ -24,13 +24,12 @@ export async function POST(request: Request) {
     }
 
     // Try to instantiate Stripe and make a lightweight API call
-    const testStripe = new Stripe(apiKey, {
-      apiVersion: "2025-04-30.basil",
-    });
+    const testStripe = new Stripe(apiKey);
 
     let account: Stripe.Account;
     try {
-      account = await testStripe.accounts.retrieve();
+      // Retrieve the account using the key itself (no args needed for secret key)
+      account = await testStripe.accounts.retrieve("self");
     } catch (stripeErr: any) {
       console.error("[API] Stripe key validation failed:", stripeErr.message);
       return NextResponse.json(
