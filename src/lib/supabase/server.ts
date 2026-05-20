@@ -8,15 +8,16 @@ import { cookies } from "next/headers";
  * The refreshed cookies are collected and must be applied to your NextResponse.
  * 
  * Example:
- *   const { supabase, applyCookies } = createRouteClient();
+ *   const { supabase, applyCookies } = await createRouteClient();
  *   const { data: { session } } = await supabase.auth.getSession();
  *   // ... do work ...
  *   const response = NextResponse.json({ ... });
  *   applyCookies(response); // <-- REQUIRED for cookie refresh to work!
  *   return response;
  */
-export function createRouteClient() {
-  const cookieStore = cookies();
+export async function createRouteClient() {
+  // Next.js 16: cookies() is async — must be awaited
+  const cookieStore = await cookies();
   const cookieList = cookieStore.getAll();
   
   // Collect cookies that need to be set (from token refresh)
