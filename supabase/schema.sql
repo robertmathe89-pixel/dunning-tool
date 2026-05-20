@@ -9,6 +9,18 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================================================
+-- AUTOMATIC `updated_at` TRIGGER FUNCTION
+-- Must be defined BEFORE any triggers that reference it.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================================
 -- 1. STRIPE CONNECTIONS
 -- Stores each user's encrypted Stripe API key and validation status.
 -- ============================================================================
@@ -240,7 +252,7 @@ CREATE TABLE IF NOT EXISTS public.user_settings (
     notify_on_abandon       BOOLEAN DEFAULT true,
     
     -- Content customisation
-    email_subject_template  TEXT DEFAULT 'Your payment failed — here's how to fix it',
+    email_subject_template  TEXT DEFAULT 'Your payment failed — here''s how to fix it',
     email_body_template     TEXT,                     -- Optional custom HTML template override
     
     -- Locale / formatting
