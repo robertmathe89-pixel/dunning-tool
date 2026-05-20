@@ -1,112 +1,84 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createRouteClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const days = parseInt(searchParams.get("days") ?? "30", 10);
-
-  if (days < 1 || days > 365) {
-    return NextResponse.json(
-      { error: "Invalid days parameter", details: "Must be between 1 and 365" },
-      { status: 400 }
-    );
-  }
-
   try {
-    const supabase = await createClient();
+    const { searchParams } = new URL(request.url);
+    const days = parseInt(searchParams.get("days") || "30", 10);
 
+    // Create Supabase client with cookie refresh support
+    const { supabase, applyCookies } = await createRouteClient();
+
+    // Refresh session
     const {
-      data: { user },
+      data: { session },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await supabase.auth.getSession();
+
+    const user = session?.user ?? null;
 
     if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      applyCookies(response);
+      return response;
     }
 
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-
-    // Fetch analytics aggregates
-    const { data: stats, error: statsError } = await supabase
+    // Recovery rate: recovered / total
+    const { data: allPayments, error: allError } = await supabaseAdmin
       .from("failed_payments")
-      .select("status, amount, currency")
+      .select("status")
       .eq("user_id", user.id)
-      .gte("created_at", since);
+      .gte("created_at", new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
 
-    if (statsError) {
-      console.error("[API] Analytics fetch error:", statsError);
-      return NextResponse.json(
-        { error: "Database error", details: statsError.message },
+    if (allError) {
+      console.error("[API] GET /analytics error:", allError);
+      const response = NextResponse.json(
+        { error: "Database error" },
         { status: 500 }
       );
+      applyCookies(response);
+      return response;
     }
 
-    const total = stats?.length ?? 0;
-    const recovered =
-      stats?.filter((r) => r.status === "recovered").length ?? 0;
-    const churned =
-      stats?.filter((r) => r.status === "churned").length ?? 0;
-    const active =
-      stats?.filter((r) => r.status === "active").length ?? 0;
+    const totalFailed = allPayments?.length ?? 0;
+    const recoveredCount = allPayments?.filter((p) => p.status === "recovered").length ?? 0;
+    const recoveryRate = totalFailed > 0 ? (recoveredCount / totalFailed) * 100 : 0;
 
-    // Sum revenue recovered (recovered payments)
-    const revenueRecovered = stats
-      ?.filter((r) => r.status === "recovered")
-      .reduce((sum, r) => sum + (r.amount ?? 0), 0) ?? 0;
+    // Revenue recovered
+    const { data: recoveredPayments, error: revError } = await supabaseAdmin
+      .from("failed_payments")
+      .select("amount")
+      .eq("user_id", user.id)
+      .eq("status", "recovered")
+      .gte("created_at", new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
 
-    // Sum churn prevented = recovered + active (still attempting)
-    const churnPrevented = stats
-      ?.filter((r) => r.status === "recovered" || r.status === "active")
-      .reduce((sum, r) => sum + (r.amount ?? 0), 0) ?? 0;
-
-    // Potential revenue at risk (active only)
-    const revenueAtRisk = stats
-      ?.filter((r) => r.status === "active")
-      .reduce((sum, r) => sum + (r.amount ?? 0), 0) ?? 0;
-
-    const recoveryRate = total > 0 ? Math.round((recovered / total) * 1000) / 10 : 0;
-
-    // Recovery attempts stats
-    const { data: attempts, error: attemptsError } = await supabase
-      .from("recovery_attempts")
-      .select("status, failed_payment_id, failed_payments!inner(user_id)")
-      .eq("failed_payments.user_id", user.id)
-      .gte("created_at", since);
-
-    if (attemptsError) {
-      console.error("[API] Analytics attempts error:", attemptsError);
+    if (revError) {
+      console.error("[API] GET /analytics revenue error:", revError);
     }
 
-    const totalAttempts = attempts?.length ?? 0;
-    const sentAttempts =
-      attempts?.filter((a) => a.status === "sent" || a.status === "delivered").length ?? 0;
-    const emailOpenRate = totalAttempts > 0 ? Math.round((sentAttempts / totalAttempts) * 1000) / 10 : 0;
+    const revenueRecovered =
+      recoveredPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) ?? 0;
 
-    return NextResponse.json(
+    // Churn prevented = recovered count (each recovered = churn prevented)
+    const churnPrevented = recoveredCount;
+
+    const response = NextResponse.json(
       {
-        periodDays: days,
-        summary: {
-          totalFailedPayments: total,
-          recovered,
-          churned,
-          active,
+        data: {
           recoveryRate,
           revenueRecovered,
           churnPrevented,
-          revenueAtRisk,
-          totalRecoveryAttempts: totalAttempts,
-          emailsSent: sentAttempts,
-          emailOpenRate,
+          totalFailed,
+          recoveredCount,
         },
-        currency: stats?.[0]?.currency ?? "usd",
       },
       { status: 200 }
     );
+    applyCookies(response);
+    return response;
   } catch (err: any) {
-    console.error("[API] GET /analytics error:", err);
+    console.error("[API] GET /analytics uncaught error:", err);
     return NextResponse.json(
       { error: "Internal server error", details: err?.message },
       { status: 500 }

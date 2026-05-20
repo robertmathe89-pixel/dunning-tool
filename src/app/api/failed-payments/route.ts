@@ -1,71 +1,58 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-
-type FilterStatus = "active" | "recovered" | "churned" | "all";
+import { createRouteClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const status = (searchParams.get("status") ?? "all") as FilterStatus;
-  const page = parseInt(searchParams.get("page") ?? "1", 10);
-  const limit = parseInt(searchParams.get("limit") ?? "20", 10);
-  const sortBy = searchParams.get("sortBy") ?? "created_at";
-  const sortOrder = searchParams.get("sortOrder") ?? "desc";
-
   try {
-    const supabase = await createClient();
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get("status") || "all";
+    const limit = parseInt(searchParams.get("limit") || "50", 10);
 
-    // Authenticate user
+    // Create Supabase client with cookie refresh support
+    const { supabase, applyCookies } = await createRouteClient();
+
+    // Refresh session
     const {
-      data: { user },
+      data: { session },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await supabase.auth.getSession();
+
+    const user = session?.user ?? null;
 
     if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      applyCookies(response);
+      return response;
     }
 
+    // Build query
     let query = supabase
       .from("failed_payments")
-      .select("*, recovery_attempts(count)", { count: "exact" })
-      .eq("user_id", user.id);
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(limit);
 
     if (status !== "all") {
       query = query.eq("status", status);
     }
 
-    // Pagination
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
-
-    const { data, error, count } = await query
-      .order(sortBy, { ascending: sortOrder === "asc" })
-      .range(from, to);
+    const { data, error } = await query;
 
     if (error) {
-      console.error("[API] Failed to fetch failed payments:", error);
-      return NextResponse.json(
+      console.error("[API] GET /failed-payments error:", error);
+      const response = NextResponse.json(
         { error: "Database error", details: error.message },
         { status: 500 }
       );
+      applyCookies(response);
+      return response;
     }
 
-    return NextResponse.json(
-      {
-        data,
-        pagination: {
-          page,
-          limit,
-          total: count ?? 0,
-          totalPages: Math.ceil((count ?? 0) / limit),
-        },
-      },
-      { status: 200 }
-    );
+    const response = NextResponse.json({ data: data || [] }, { status: 200 });
+    applyCookies(response);
+    return response;
   } catch (err: any) {
-    console.error("[API] GET /failed-payments error:", err);
+    console.error("[API] GET /failed-payments uncaught error:", err);
     return NextResponse.json(
       { error: "Internal server error", details: err?.message },
       { status: 500 }

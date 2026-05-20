@@ -7,7 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Check, AlertCircle, Mail, CreditCard, User, Clock, Trash2 } from "lucide-react";
+import { Check, AlertCircle, Mail, CreditCard, User, Clock, Trash2, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 
 export default function SettingsPage() {
   const [stripeKey, setStripeKey] = useState("");
@@ -45,6 +46,15 @@ export default function SettingsPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       {/* Header */}
+      <div className="flex items-center gap-4 mb-2">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 text-sm text-[#8A8A9E] hover:text-white transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Dashboard
+        </Link>
+      </div>
       <div>
         <h1 className="text-2xl font-bold text-white mb-1">Settings</h1>
         <p className="text-[#8A8A9E]">Configure your account and integrations</p>

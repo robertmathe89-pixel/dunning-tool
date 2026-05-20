@@ -118,28 +118,29 @@ export async function validateSmtpConfig(
  * @param subject          Subject line that was sent
  */
 export async function logEmailSent(
+  userId: string,
   failedPaymentId: string,
   templateName: string,
-  subject: string
+  subject: string,
+  recipientEmail: string
 ): Promise<void> {
   try {
     const { error } = await supabaseAdmin.from("email_logs").insert({
+      user_id: userId,
       failed_payment_id: failedPaymentId,
-      template_name: templateName,
+      email_type: templateName,
       subject,
+      recipient_email: recipientEmail,
+      status: "sent",
       sent_at: new Date().toISOString(),
     });
 
     if (error) {
-      throw new Error(
-        `[EMAIL] Failed to log email to Supabase: ${error.message}`
-      );
+      console.error("[EMAIL] Failed to log email to Supabase:", error.message);
+      // Non-fatal: don't throw, just log
     }
   } catch (err: any) {
-    const message = err?.message || String(err);
-    if (!message.startsWith("[EMAIL]")) {
-      throw new Error(`[EMAIL] Failed to log email: ${message}`);
-    }
-    throw err;
+    console.error("[EMAIL] Failed to log email:", err?.message || String(err));
+    // Non-fatal: don't throw
   }
 }

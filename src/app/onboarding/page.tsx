@@ -71,19 +71,29 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
 
   // ---------------------------------------------------------------------------
-  // On mount: check if user is already authenticated
+  // On mount: if already authenticated, redirect to dashboard immediately
   // ---------------------------------------------------------------------------
   useEffect(() => {
     async function checkAuth() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        setUser(session.user);
-        setStep(1); // Skip auth step
+        // Already logged in — skip onboarding entirely
+        router.replace("/dashboard");
+        return;
       }
       setCheckingAuth(false);
     }
     checkAuth();
-  }, [supabase]);
+
+    // Also listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        router.replace("/dashboard");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase, router]);
 
   // ---------------------------------------------------------------------------
   // Step 0: Email + Password Auth
