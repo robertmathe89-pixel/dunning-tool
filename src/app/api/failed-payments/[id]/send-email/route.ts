@@ -32,27 +32,42 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch the failed payment with owner check
-    const { data: failedPayment, error: fetchError } = await supabase
-      .from("failed_payments")
-      .select("*")
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .maybeSingle();
+    // ── DEMO PAYMENT: bypass DB lookup, send test email ──
+    const isDemo = id.startsWith("demo-");
+    let failedPayment: any = null;
 
-    if (fetchError) {
-      console.error("[API] POST /send-email fetch error:", fetchError);
-      return NextResponse.json(
-        { error: "Database error", details: fetchError.message },
-        { status: 500 }
-      );
-    }
+    if (isDemo) {
+      const demoMap: Record<string, any> = {
+        "demo-1": { customer_name: "John Smith", customer_email: "john@company.com", amount: 4900, currency: "usd", reason: "Card expired" },
+        "demo-2": { customer_name: "Sarah Chen", customer_email: "sarah@startup.io", amount: 9900, currency: "usd", reason: "Insufficient funds" },
+        "demo-3": { customer_name: "Mike Johnson", customer_email: "mike@tech.co", amount: 2900, currency: "usd", reason: "Card expired" },
+      };
+      failedPayment = demoMap[id] || demoMap["demo-1"];
+      console.log("[API] Sending demo recovery email for", id);
+    } else {
+      // Fetch real failed payment from DB
+      const { data: fp, error: fetchError } = await supabase
+        .from("failed_payments")
+        .select("*")
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-    if (!failedPayment) {
-      return NextResponse.json(
-        { error: "Failed payment not found" },
-        { status: 404 }
-      );
+      if (fetchError) {
+        console.error("[API] POST /send-email fetch error:", fetchError);
+        return NextResponse.json(
+          { error: "Database error", details: fetchError.message },
+          { status: 500 }
+        );
+      }
+
+      if (!fp) {
+        return NextResponse.json(
+          { error: "Failed payment not found" },
+          { status: 404 }
+        );
+      }
+      failedPayment = fp;
     }
 
     // Fetch user settings (sender name, email, SMTP config)
