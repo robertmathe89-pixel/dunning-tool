@@ -114,9 +114,12 @@ export default function SettingsPage() {
   };
 
   const validateStripe = async () => {
-    if (!stripeKey.startsWith("sk_")) {
+    const cleanKey = stripeKey.trim();
+    console.log("Validating Stripe key, length:", cleanKey.length, "prefix:", cleanKey.substring(0, 10));
+    
+    if (!cleanKey.startsWith("sk_")) {
       setStripeStatus("error");
-      setEmailMessage("Key must start with 'sk_'");
+      setEmailMessage(`Key format invalid. Starts with: "${cleanKey.substring(0, 10)}"`);
       return;
     }
 
@@ -128,7 +131,7 @@ export default function SettingsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ apiKey: stripeKey }),
+        body: JSON.stringify({ apiKey: cleanKey }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -142,7 +145,7 @@ export default function SettingsPage() {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ stripe_secret_key: stripeKey }),
+          body: JSON.stringify({ stripe_secret_key: cleanKey }),
         });
       } else if (res.status === 401) {
         setStripeStatus("error");
