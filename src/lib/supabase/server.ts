@@ -50,9 +50,21 @@ function setCachedUser(cookieHeader: string, userId: string | null): void {
  *   return response;
  */
 export async function createRouteClient(request?: Request) {
-  // Next.js 16: cookies() is async -- must be awaited
-  const cookieStore = await cookies();
-  const cookieList = cookieStore.getAll();
+  // For Route Handlers, parse cookies from the Request object.
+  // cookies() from next/headers is for Server Components and can fail in API routes.
+  let cookieList: Array<{ name: string; value: string }> = [];
+  
+  if (request) {
+    const cookieHeader = request.headers.get("cookie") || "";
+    cookieList = cookieHeader.split(";").map((c) => {
+      const [name, ...rest] = c.trim().split("=");
+      return { name, value: rest.join("=") };
+    }).filter((c) => c.name);
+  } else {
+    // Fallback to cookies() if no request provided (Server Component context)
+    const cookieStore = await cookies();
+    cookieList = cookieStore.getAll();
+  }
   
   // Collect cookies that need to be set (from token refresh)
   const cookiesToSet: Array<{ name: string; value: string; options?: any }> = [];

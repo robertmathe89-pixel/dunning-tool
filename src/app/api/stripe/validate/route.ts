@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     }
 
     // Get user first
-    const { supabase, applyCookies } = await createRouteClient();
+    const { supabase, applyCookies } = await createRouteClient(request);
     const { userId, response: cachedResponse } = await getUserIdFromRequest(
       request,
       supabase,
