@@ -7,8 +7,10 @@
 
 export {
   sendEmail,
-  validateSmtpConfig,
-  logEmailSent,
+  getEmailConfig,
+  getDefaultEmailConfig,
+  createTransporter,
+  renderDunningEmail,
 } from "./service";
 
 export {

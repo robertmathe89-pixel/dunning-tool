@@ -79,15 +79,22 @@ export async function POST(
       failedPayment = fp;
     }
 
-    // Fetch user settings
-    const { data: settings, error: settingsError } = await supabase
-      .from("user_settings")
-      .select("company_name, sender_name, sender_email, smtp_host, smtp_port, smtp_user, smtp_pass")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    // Fetch user settings (handle missing columns gracefully)
+    let settings: any = null;
+    try {
+      const { data: s, error: settingsError } = await supabase
+        .from("user_settings")
+        .select("company_name, sender_name, sender_email, smtp_host, smtp_port, smtp_user")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-    if (settingsError) {
-      console.error("[API] POST /send-email settings error:", settingsError);
+      if (!settingsError) {
+        settings = s;
+      } else {
+        console.error("[API] POST /send-email settings error:", settingsError);
+      }
+    } catch (e) {
+      console.error("[API] POST /send-email settings fetch failed:", e);
     }
 
     // Get attempt number
@@ -134,12 +141,22 @@ export async function POST(
     const from = settings?.sender_email || process.env.SMTP_USER || "noreply@dunning-tool.vercel.app";
 
     try {
-      await sendEmail(
-        failedPayment.customer_email,
-        subject,
-        finalBody,
-        from
-      );
+      // Use Gmail fallback config for now
+      const emailConfig = {
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        user: "ai.studioprojects2025@gmail.com",
+        pass: process.env.GMAIL_APP_PASSWORD || "",
+        fromEmail: "ai.studioprojects2025@gmail.com",
+        fromName: settings?.sender_name || "Pitiu",
+      };
+      await sendEmail(emailConfig, {
+        to: failedPayment.customer_email,
+        subject: subject,
+        html: finalBody,
+        text: finalBody,
+      });
     } catch (sendErr: any) {
       console.error("[API] POST /send-email send failed:", sendErr.message);
 

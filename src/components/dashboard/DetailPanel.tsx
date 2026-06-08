@@ -57,6 +57,7 @@ export function DetailPanel({ payment, open, onOpenChange, onStatusChange }: Det
   const [sendError, setSendError] = useState("");
   const [sendSuccess, setSendSuccess] = useState(false);
   const [markingRecovered, setMarkingRecovered] = useState(false);
+  const [markingAbandoned, setMarkingAbandoned] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
   if (!payment) return null;
@@ -118,10 +119,9 @@ export function DetailPanel({ payment, open, onOpenChange, onStatusChange }: Det
   const handleMarkRecovered = async () => {
     setMarkingRecovered(true);
     try {
-      const res = await fetch(`/api/failed-payments/${payment.id}`, {
-        method: "PATCH",
+      const res = await fetch(`/api/failed-payments/${payment.id}/recover`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "recovered" }),
       });
 
       if (!res.ok) {
@@ -130,12 +130,33 @@ export function DetailPanel({ payment, open, onOpenChange, onStatusChange }: Det
         return;
       }
 
-      // Notify parent to refresh the list
       onStatusChange?.(payment.id, "recovered");
     } catch (err) {
       console.error("[DETAIL] Mark recovered error:", err);
     } finally {
       setMarkingRecovered(false);
+    }
+  };
+
+  const handleMarkAbandoned = async () => {
+    setMarkingAbandoned(true);
+    try {
+      const res = await fetch(`/api/failed-payments/${payment.id}/abandon`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        console.error("[DETAIL] Mark abandoned failed:", data);
+        return;
+      }
+
+      onStatusChange?.(payment.id, "abandoned");
+    } catch (err) {
+      console.error("[DETAIL] Mark abandoned error:", err);
+    } finally {
+      setMarkingAbandoned(false);
     }
   };
 
@@ -250,10 +271,22 @@ export function DetailPanel({ payment, open, onOpenChange, onStatusChange }: Det
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
                         item.status === "sent"
                           ? "bg-[#10B981]/20"
+                          : item.status === "opened"
+                          ? "bg-[#3B82F6]/20"
+                          : item.status === "clicked"
+                          ? "bg-[#8B5CF6]/20"
+                          : item.status === "bounced"
+                          ? "bg-[#EF4444]/20"
                           : "bg-[#22222E]"
                       }`}>
                         {item.status === "sent" ? (
                           <CheckCircle className="w-3 h-3 text-[#10B981]" />
+                        ) : item.status === "opened" ? (
+                          <CheckCircle className="w-3 h-3 text-[#3B82F6]" />
+                        ) : item.status === "clicked" ? (
+                          <CheckCircle className="w-3 h-3 text-[#8B5CF6]" />
+                        ) : item.status === "bounced" ? (
+                          <CheckCircle className="w-3 h-3 text-[#EF4444]" />
                         ) : (
                           <Clock className="w-3 h-3 text-[#5A5A6E]" />
                         )}
@@ -361,6 +394,18 @@ export function DetailPanel({ payment, open, onOpenChange, onStatusChange }: Det
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     "Mark Recovered"
+                  )}
+                </Button>
+                <Button
+                  onClick={handleMarkAbandoned}
+                  disabled={markingAbandoned || !isActive}
+                  variant="outline"
+                  className="flex-1 border-[#EF4444]/30 text-[#EF4444] hover:bg-[#EF4444]/10"
+                >
+                  {markingAbandoned ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    "Mark Abandoned"
                   )}
                 </Button>
               </div>

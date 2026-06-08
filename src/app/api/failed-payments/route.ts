@@ -17,7 +17,7 @@ export async function GET(request: Request) {
       const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       if (cachedResponse) {
         // Copy any refreshed cookies from the cached response
-        cachedResponse.cookies.getAll().forEach((cookie) => {
+        cachedResponse.cookies.getAll().forEach((cookie: any) => {
           response.cookies.set(cookie.name, cookie.value, cookie);
         });
       }

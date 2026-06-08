@@ -83,6 +83,13 @@ const ALLOWED_SETTINGS = [
   "auto_recovery_enabled",
   "recovery_delay_hours",
   "max_recovery_attempts",
+  "sender_name",
+  "company_name",
+  "sender_email",
+  "smtp_host",
+  "smtp_port",
+  "smtp_user",
+  "smtp_pass",
 ] as const;
 
 export async function PATCH(request: Request) {

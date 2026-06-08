@@ -27,14 +27,17 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+
+// Prevent static prerender — this page needs Supabase env vars at runtime
+export const dynamic = "force-dynamic";
 
 // Steps display: 1-4 (auth is always step 1 visually, but we skip if already logged in)
 // Internal step: 0=auth, 1=stripe, 2=email, 3=preview
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const supabase = createClient();
+
+  const [supabaseClient, setSupabaseClient] = useState<any>(null);
 
   // Auth state
   const [user, setUser] = useState<any>(null);
@@ -71,18 +74,33 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
 
   // ---------------------------------------------------------------------------
+  // On mount: initialize Supabase client lazily
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    // Lazy load Supabase client to avoid env var issues during prerender
+    const initSupabase = async () => {
+      const { createClient } = await import("@/lib/supabase/client");
+      const client = createClient();
+      setSupabaseClient(client);
+    };
+    initSupabase();
+  }, []);
+
+  // ---------------------------------------------------------------------------
   // On mount: if already authenticated, redirect to dashboard immediately
   // ---------------------------------------------------------------------------
   useEffect(() => {
+    if (!supabaseClient) return;
+
     // Use onAuthStateChange to detect login and redirect (no repeated getSession calls)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((event: string, session: any) => {
       if (session?.user) {
         router.replace("/dashboard");
       }
     });
 
     // Check session once on mount (getSession reads from memory, only networks if token expired)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabaseClient.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
       if (session?.user) {
         router.replace("/dashboard");
       } else {
@@ -91,7 +109,7 @@ export default function OnboardingPage() {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase, router]);
+  }, [supabaseClient, router]);
 
   // ---------------------------------------------------------------------------
   // Step 0: Email + Password Auth
@@ -114,9 +132,15 @@ export default function OnboardingPage() {
 
     const mode = isExistingUser ? "signin" : "signup";
 
+    if (!supabaseClient) {
+      setAuthError("Supabase client not initialized. Please refresh the page.");
+      setAuthStatus("error");
+      return;
+    }
+
     if (mode === "signup") {
       // Try to create account
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
         email: authEmail,
         password: authPassword,
       });
@@ -144,7 +168,7 @@ export default function OnboardingPage() {
       }
 
       // No session yet (email confirmation may be enabled) — try to sign in
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
         email: authEmail,
         password: authPassword,
       });
@@ -166,7 +190,7 @@ export default function OnboardingPage() {
       }
     } else {
       // Sign in existing user
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
         email: authEmail,
         password: authPassword,
       });

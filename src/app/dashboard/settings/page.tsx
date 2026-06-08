@@ -1,16 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Check, AlertCircle, Mail, CreditCard, User, Clock, Trash2, ArrowLeft } from "lucide-react";
+import { Check, AlertCircle, Mail, CreditCard, User, Clock, Trash2, ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 export default function SettingsPage() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  
   const [stripeKey, setStripeKey] = useState("");
   const [stripeStatus, setStripeStatus] = useState<"idle" | "validating" | "success" | "error">("idle");
   
@@ -19,32 +23,174 @@ export default function SettingsPage() {
   const [smtpUser, setSmtpUser] = useState("");
   const [smtpPass, setSmtpPass] = useState("");
   const [emailStatus, setEmailStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [emailMessage, setEmailMessage] = useState("");
   
-  const [founderName, setFounderName] = useState("Sarah");
-  const [companyName, setCompanyName] = useState("HerStartup");
+  const [founderName, setFounderName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [autoFallback, setAutoFallback] = useState(true);
   const [retryDays, setRetryDays] = useState([1, 3, 7, 14]);
 
-  const validateStripe = () => {
+  // Load saved settings on mount
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch("/api/settings");
+      if (!res.ok) {
+        console.error("Failed to load settings");
+        setLoading(false);
+        return;
+      }
+      const { data } = await res.json();
+      
+      if (data) {
+        // Populate fields with saved values
+        setSmtpHost(data.smtp_host || "smtp.gmail.com");
+        setSmtpPort(data.smtp_port?.toString() || "587");
+        setSmtpUser(data.smtp_user || "");
+        // Don't populate password for security
+        setFounderName(data.sender_name || "");
+        setCompanyName(data.company_name || "");
+        setAutoFallback(data.auto_recovery_enabled ?? true);
+        if (data.recovery_delay_hours) {
+          // Convert hours to days for display
+          setRetryDays([
+            data.recovery_delay_hours / 24 || 1,
+            3, 7, 14 // Default for others if not saved
+          ]);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading settings:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveSettings = async () => {
+    setSaving(true);
+    setSaveMessage("");
+    
+    try {
+      const updates: any = {
+        sender_name: founderName || null,
+        company_name: companyName || null,
+        sender_email: smtpUser || null,
+        smtp_host: smtpHost || null,
+        smtp_port: parseInt(smtpPort) || null,
+        smtp_user: smtpUser || null,
+        auto_recovery_enabled: autoFallback,
+        recovery_delay_hours: retryDays[0] * 24,
+      };
+      
+      // Only include password if provided
+      if (smtpPass) {
+        updates.smtp_pass = smtpPass;
+      }
+
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+
+      if (res.ok) {
+        setSaveMessage("Settings saved!");
+        // Clear password after save
+        setSmtpPass("");
+      } else {
+        const err = await res.json();
+        setSaveMessage(`Error: ${err.error || "Failed to save"}`);
+      }
+    } catch (err: any) {
+      setSaveMessage(`Error: ${err.message}`);
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSaveMessage(""), 3000);
+    }
+  };
+
+  const validateStripe = async () => {
+    if (!stripeKey.startsWith("sk_")) {
+      setStripeStatus("error");
+      return;
+    }
+
     setStripeStatus("validating");
-    setTimeout(() => {
-      if (stripeKey.startsWith("sk_")) {
+    
+    try {
+      const res = await fetch("/api/stripe/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: stripeKey }),
+      });
+
+      if (res.ok) {
         setStripeStatus("success");
+        // Save the stripe key
+        await fetch("/api/settings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stripe_secret_key: stripeKey }),
+        });
       } else {
         setStripeStatus("error");
       }
-    }, 1500);
+    } catch {
+      setStripeStatus("error");
+    }
   };
 
-  const testEmail = () => {
+  const testEmail = async () => {
     setEmailStatus("testing");
-    setTimeout(() => {
-      setEmailStatus("success");
-    }, 2000);
+    setEmailMessage("");
+    
+    try {
+      // First save the settings
+      await saveSettings();
+      
+      // Then test the connection
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sender_name: founderName,
+          company_name: companyName,
+          sender_email: smtpUser,
+          smtp_host: smtpHost,
+          smtp_port: parseInt(smtpPort),
+          smtp_user: smtpUser,
+          ...(smtpPass ? { smtp_pass: smtpPass } : {}),
+        }),
+      });
+
+      if (res.ok) {
+        setEmailStatus("success");
+        setEmailMessage("Test email sent! Check your inbox.");
+        setSmtpPass(""); // Clear password after test
+      } else {
+        const err = await res.json();
+        setEmailStatus("error");
+        setEmailMessage(err.error || "Failed to send test email");
+      }
+    } catch (err: any) {
+      setEmailStatus("error");
+      setEmailMessage(err.message || "Network error");
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-3xl mx-auto p-8 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[#F59E0B] animate-spin" />
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
+    <div className="max-w-3xl mx-auto space-y-8 p-4">
       {/* Header */}
       <div className="flex items-center gap-4 mb-2">
         <Link
@@ -55,10 +201,25 @@ export default function SettingsPage() {
           Back to Dashboard
         </Link>
       </div>
-      <div>
-        <h1 className="text-2xl font-bold text-white mb-1">Settings</h1>
-        <p className="text-[#8A8A9E]">Configure your account and integrations</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-1">Settings</h1>
+          <p className="text-[#8A8A9E]">Configure your account and integrations</p>
+        </div>
+        <Button
+          onClick={saveSettings}
+          disabled={saving}
+          className="bg-[#F59E0B] hover:bg-[#D97706] text-[#0A0A0F] font-semibold"
+        >
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save All"}
+        </Button>
       </div>
+      
+      {saveMessage && (
+        <div className={`p-3 rounded-lg ${saveMessage.includes("Error") ? "bg-[#EF4444]/10 text-[#EF4444]" : "bg-[#10B981]/10 text-[#10B981]"}`}>
+          {saveMessage}
+        </div>
+      )}
 
       {/* Stripe Connection */}
       <Card className="bg-[#111118] border-[#22222E]">
@@ -168,25 +329,33 @@ export default function SettingsPage() {
               <Label className="text-sm text-[#8A8A9E] mb-2 block">Password</Label>
               <Input
                 type="password"
-                placeholder="App Password (not your regular password)"
+                placeholder={smtpUser ? "Enter password to update" : "App Password (not your regular password)"}
                 value={smtpPass}
                 onChange={(e) => setSmtpPass(e.target.value)}
                 className="bg-[#0A0A0F] border-[#22222E] text-white placeholder:text-[#5A5A6E]"
               />
+              {smtpUser && !smtpPass && (
+                <p className="text-xs text-[#5A5A6E] mt-1">Password saved. Enter new password to update.</p>
+              )}
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-center">
               <Button
                 onClick={testEmail}
-                disabled={emailStatus === "testing"}
+                disabled={emailStatus === "testing" || !smtpUser}
                 variant="outline"
                 className="border-[#22222E] text-white hover:bg-[#1A1A24] hover:text-white"
               >
-                {emailStatus === "testing" ? "Testing..." : "Test Connection"}
+                {emailStatus === "testing" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Testing...</> : "Test Connection"}
               </Button>
               {emailStatus === "success" && (
                 <Badge className="bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20">
-                  Test email sent!
+                  {emailMessage}
+                </Badge>
+              )}
+              {emailStatus === "error" && (
+                <Badge className="bg-[#EF4444]/10 text-[#EF4444] border-[#EF4444]/20">
+                  {emailMessage}
                 </Badge>
               )}
             </div>

@@ -19,12 +19,12 @@ export default function DashboardLayout({
     const supabase = createClient();
 
     // Get initial user from the active session (no network call if session is in memory)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
       setUserEmail(session?.user?.email || null);
     });
 
     // Listen for auth state changes (single listener, no repeated network calls)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: any) => {
       setUserEmail(session?.user?.email || null);
     });
 
