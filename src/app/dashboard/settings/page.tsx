@@ -116,10 +116,12 @@ export default function SettingsPage() {
   const validateStripe = async () => {
     if (!stripeKey.startsWith("sk_")) {
       setStripeStatus("error");
+      setEmailMessage("Key must start with 'sk_'");
       return;
     }
 
     setStripeStatus("validating");
+    setEmailMessage("");
     
     try {
       const res = await fetch("/api/stripe/validate", {
@@ -128,8 +130,11 @@ export default function SettingsPage() {
         body: JSON.stringify({ apiKey: stripeKey }),
       });
 
+      const data = await res.json().catch(() => ({}));
+
       if (res.ok) {
         setStripeStatus("success");
+        setEmailMessage("Connected! Webhooks are active.");
         // Save the stripe key
         await fetch("/api/settings", {
           method: "PATCH",
@@ -138,9 +143,11 @@ export default function SettingsPage() {
         });
       } else {
         setStripeStatus("error");
+        setEmailMessage(data.error || data.details || "Invalid key. Make sure it's a secret key (sk_...)");
       }
-    } catch {
+    } catch (err: any) {
       setStripeStatus("error");
+      setEmailMessage(err.message || "Network error");
     }
   };
 
