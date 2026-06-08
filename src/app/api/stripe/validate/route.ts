@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     // Try to instantiate Stripe and make a lightweight API call
     let testStripe: Stripe;
     try {
-      testStripe = new Stripe(apiKey, { apiVersion: "2024-12-18.acacia" });
+      testStripe = new Stripe(apiKey, { apiVersion: "2026-04-22.dahlia" });
     } catch (initErr: any) {
       console.error("[API] Stripe init failed:", initErr.message);
       return NextResponse.json(
