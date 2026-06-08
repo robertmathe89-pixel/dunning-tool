@@ -8,6 +8,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { apiKey } = body;
 
+    console.log("[API] Stripe validate called, key prefix:", apiKey?.substring(0, 10) + "...");
+
     if (!apiKey || typeof apiKey !== "string") {
       return NextResponse.json(
         { error: "Missing API key", details: "Provide a Stripe Standard API key" },
@@ -21,6 +23,29 @@ export async function POST(request: Request) {
         { error: "Invalid key format", details: "Stripe secret keys start with 'sk_'" },
         { status: 400 }
       );
+    }
+
+    // Get user first
+    const { supabase, applyCookies } = await createRouteClient();
+    const { userId, response: cachedResponse } = await getUserIdFromRequest(
+      request,
+      supabase,
+      applyCookies
+    );
+
+    console.log("[API] User ID:", userId);
+
+    if (!userId) {
+      const response = NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+      if (cachedResponse) {
+        cachedResponse.cookies.getAll().forEach((cookie: any) => {
+          response.cookies.set(cookie.name, cookie.value, cookie);
+        });
+      }
+      return response;
     }
 
     // Try to instantiate Stripe and make a lightweight API call
@@ -53,26 +78,6 @@ export async function POST(request: Request) {
     }
 
     // Key is valid — persist it (upsert into user_settings)
-    const { supabase, applyCookies } = await createRouteClient();
-    const { userId, response: cachedResponse } = await getUserIdFromRequest(
-      request,
-      supabase,
-      applyCookies
-    );
-
-    if (!userId) {
-      const response = NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-      if (cachedResponse) {
-        cachedResponse.cookies.getAll().forEach((cookie: any) => {
-          response.cookies.set(cookie.name, cookie.value, cookie);
-        });
-      }
-      return response;
-    }
-
     const { error: upsertError } = await supabaseAdmin
       .from("user_settings")
       .upsert(
