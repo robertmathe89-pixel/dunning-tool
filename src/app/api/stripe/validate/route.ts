@@ -24,12 +24,22 @@ export async function POST(request: Request) {
     }
 
     // Try to instantiate Stripe and make a lightweight API call
-    const testStripe = new Stripe(apiKey);
+    let testStripe: Stripe;
+    try {
+      testStripe = new Stripe(apiKey, { apiVersion: "2024-12-18.acacia" });
+    } catch (initErr: any) {
+      console.error("[API] Stripe init failed:", initErr.message);
+      return NextResponse.json(
+        { error: "Stripe init failed", details: initErr.message, valid: false },
+        { status: 400 }
+      );
+    }
 
     let account: Stripe.Account;
     try {
       // Retrieve the account using the key itself (no args needed for secret key)
       account = await testStripe.accounts.retrieve("self");
+      console.log("[API] Stripe account retrieved:", account.id);
     } catch (stripeErr: any) {
       console.error("[API] Stripe key validation failed:", stripeErr.message);
       return NextResponse.json(
