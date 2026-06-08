@@ -49,7 +49,8 @@ export default function SettingsPage() {
         // Populate fields with saved values
         setSmtpHost(data.smtp_host || "smtp.gmail.com");
         setSmtpPort(data.smtp_port?.toString() || "587");
-        setSmtpUser(data.smtp_user || "");
+        // Auto-populate with user's login email if no SMTP user is set
+        setSmtpUser(data.smtp_user || data.user_email || "");
         // Don't populate password for security
         setFounderName(data.sender_name || "");
         setCompanyName(data.company_name || "");
@@ -323,6 +324,9 @@ export default function SettingsPage() {
                 onChange={(e) => setSmtpUser(e.target.value)}
                 className="bg-[#0A0A0F] border-[#22222E] text-white placeholder:text-[#5A5A6E]"
               />
+              <p className="text-xs text-[#5A5A6E] mt-1">
+                Auto-filled from your login email. Change this if you want to use a different sender address.
+              </p>
             </div>
 
             <div>

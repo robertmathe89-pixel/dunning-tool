@@ -40,6 +40,10 @@ export async function GET(request: Request) {
       return response;
     }
 
+    // Get user email from session for auto-populate
+    const { data: { user } } = await supabase.auth.getUser();
+    const userEmail = user?.email || null;
+
     if (!data) {
       // Return defaults if no settings row exists yet
       const response = NextResponse.json(
@@ -54,6 +58,7 @@ export async function GET(request: Request) {
             max_recovery_attempts: 3,
             created_at: null,
             updated_at: null,
+            user_email: userEmail,
           },
         },
         { status: 200 }
@@ -65,7 +70,10 @@ export async function GET(request: Request) {
     // Strip sensitive fields from the response
     const { stripe_secret_key, stripe_webhook_secret, ...safeData } = data;
 
-    const response = NextResponse.json({ data: safeData }, { status: 200 });
+    const response = NextResponse.json(
+      { data: { ...safeData, user_email: userEmail } },
+      { status: 200 }
+    );
     applyCookies(response);
     return response;
   } catch (err: any) {
