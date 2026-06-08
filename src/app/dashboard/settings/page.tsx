@@ -132,6 +132,7 @@ export default function SettingsPage() {
       });
 
       const data = await res.json().catch(() => ({}));
+      console.log("Stripe validate response:", res.status, data);
 
       if (res.ok) {
         setStripeStatus("success");
@@ -140,14 +141,15 @@ export default function SettingsPage() {
         await fetch("/api/settings", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ stripe_secret_key: stripeKey }),
         });
       } else if (res.status === 401) {
         setStripeStatus("error");
-        setEmailMessage("Session expired. Please sign in again.");
+        setEmailMessage(`Auth failed: ${data.error || "Session expired"}. Try refreshing the page.`);
       } else {
         setStripeStatus("error");
-        setEmailMessage(data.error || data.details || `Server error (${res.status})`);
+        setEmailMessage(`${data.error || "Error"}: ${data.details || `HTTP ${res.status}`}`);
       }
     } catch (err: any) {
       setStripeStatus("error");
