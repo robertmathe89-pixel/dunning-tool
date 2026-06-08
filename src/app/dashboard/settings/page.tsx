@@ -127,6 +127,7 @@ export default function SettingsPage() {
       const res = await fetch("/api/stripe/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ apiKey: stripeKey }),
       });
 
@@ -141,9 +142,12 @@ export default function SettingsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ stripe_secret_key: stripeKey }),
         });
+      } else if (res.status === 401) {
+        setStripeStatus("error");
+        setEmailMessage("Session expired. Please sign in again.");
       } else {
         setStripeStatus("error");
-        setEmailMessage(data.error || data.details || "Invalid key. Make sure it's a secret key (sk_...)");
+        setEmailMessage(data.error || data.details || `Server error (${res.status})`);
       }
     } catch (err: any) {
       setStripeStatus("error");
