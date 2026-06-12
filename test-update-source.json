@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "template_version": 0
+  },
+  "fixtures": [
+    {
+      "name": "source",
+      "path": "/v1/customers/cus_UfOWZv08YD9YlS/sources",
+      "method": "post",
+      "params": {
+        "source": "tok_chargeDeclined"
+      }
+    },
+    {
+      "name": "update_customer",
+      "path": "/v1/customers/cus_UfOWZv08YD9YlS",
+      "method": "post",
+      "params": {
+        "default_source": "${source:id}"
+      }
+    }
+  ]
+}

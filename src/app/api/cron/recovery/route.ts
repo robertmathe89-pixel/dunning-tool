@@ -18,6 +18,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  console.log("[cron/recovery] GMAIL_APP_PASSWORD set:", !!process.env.GMAIL_APP_PASSWORD);
+  console.log("[cron/recovery] GMAIL_APP_PASSWORD length:", process.env.GMAIL_APP_PASSWORD?.length || 0);
+  console.log("[cron/recovery] NEXT_PUBLIC_SUPABASE_URL set:", !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+  console.log("[cron/recovery] SUPABASE_SERVICE_ROLE_KEY set:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || "",
     process.env.SUPABASE_SERVICE_ROLE_KEY || ""
@@ -46,8 +51,7 @@ export async function GET(request: NextRequest) {
           customer_name,
           amount,
           currency,
-          user_id,
-          retry_url
+          user_id
         )
       `)
       .eq("status", "scheduled")
@@ -89,6 +93,12 @@ export async function GET(request: NextRequest) {
       // Load email config for this user
       const emailConfig = await getEmailConfig(userId);
       
+      console.log("[cron/recovery] Email config for user:", userId);
+      console.log("[cron/recovery] Email config host:", emailConfig?.host);
+      console.log("[cron/recovery] Email config user:", emailConfig?.user);
+      console.log("[cron/recovery] Email config pass set:", !!emailConfig?.pass);
+      console.log("[cron/recovery] Email config pass length:", emailConfig?.pass?.length || 0);
+      
       if (!emailConfig) {
         const error = `No email config for user ${userId}`;
         console.error(`[cron/recovery] ${error}`);
@@ -126,7 +136,7 @@ export async function GET(request: NextRequest) {
             customerName: payment.customer_name || "there",
             amount: payment.amount,
             currency: payment.currency,
-            retryUrl: payment.retry_url || "#",
+            retryUrl: "#",
             founderName: user?.sender_name || "The Team",
             companyName: user?.company_name || undefined,
           });
@@ -158,6 +168,46 @@ export async function GET(request: NextRequest) {
               message_id: sendResult.messageId,
               created_at: new Date().toISOString(),
             });
+
+            // Schedule next attempt if not at max retries
+            const { data: userSettings } = await supabase
+              .from("user_settings")
+              .select("retry_schedule, max_retries")
+              .eq("user_id", userId)
+              .single();
+
+            const retrySchedule = userSettings?.retry_schedule || [1, 3, 7];
+            const maxRetries = userSettings?.max_retries || 3;
+            const nextAttemptNumber = attempt.attempt_number + 1;
+
+            if (nextAttemptNumber <= maxRetries && nextAttemptNumber <= retrySchedule.length + 1) {
+              const scheduleIndex = nextAttemptNumber - 2; // attempt 2 uses index 0
+              const daysToAdd = retrySchedule[scheduleIndex];
+              
+              if (daysToAdd) {
+                const scheduledDate = new Date();
+                scheduledDate.setDate(scheduledDate.getDate() + daysToAdd);
+
+                await supabase.from("recovery_attempts").insert({
+                  user_id: userId,
+                  failed_payment_id: attempt.failed_payment_id,
+                  attempt_number: nextAttemptNumber,
+                  status: "scheduled",
+                  scheduled_at: scheduledDate.toISOString(),
+                  email_subject: `Reminder: Payment update needed — ${user?.company_name || user?.sender_name || "The Team"}`,
+                });
+
+                console.log(`[cron/recovery] Scheduled attempt ${nextAttemptNumber} for ${scheduledDate.toISOString()}`);
+              }
+            } else {
+              // Max retries reached, mark failed_payment as abandoned
+              await supabase
+                .from("failed_payments")
+                .update({ status: "abandoned", abandoned_at: new Date().toISOString() })
+                .eq("id", attempt.failed_payment_id);
+              
+              console.log(`[cron/recovery] Max retries reached for ${attempt.failed_payment_id}, marked abandoned`);
+            }
 
             results.sent++;
           } else {

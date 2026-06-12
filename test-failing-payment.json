@@ -1,0 +1,53 @@
+{
+  "_meta": {
+    "template_version": 0
+  },
+  "fixtures": [
+    {
+      "name": "source",
+      "path": "/v1/customers/cus_UfOUCnhwOzE2iM/sources",
+      "method": "post",
+      "params": {
+        "source": "tok_chargeDeclined"
+      }
+    },
+    {
+      "name": "update_customer",
+      "path": "/v1/customers/cus_UfOUCnhwOzE2iM",
+      "method": "post",
+      "params": {
+        "default_source": "${source:id}"
+      }
+    },
+    {
+      "name": "invoiceitem",
+      "path": "/v1/invoiceitems",
+      "method": "post",
+      "params": {
+        "customer": "cus_UfOUCnhwOzE2iM",
+        "amount": 3000,
+        "currency": "usd",
+        "description": "Test dunning webhook with failing card"
+      }
+    },
+    {
+      "name": "invoice",
+      "path": "/v1/invoices",
+      "method": "post",
+      "params": {
+        "customer": "cus_UfOUCnhwOzE2iM",
+        "collection_method": "charge_automatically"
+      }
+    },
+    {
+      "name": "invoice_finalize",
+      "path": "/v1/invoices/${invoice:id}/finalize",
+      "method": "post"
+    },
+    {
+      "name": "invoice_pay",
+      "path": "/v1/invoices/${invoice:id}/pay",
+      "method": "post"
+    }
+  ]
+}

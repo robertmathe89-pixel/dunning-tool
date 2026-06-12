@@ -1,0 +1,37 @@
+{
+  "_meta": {
+    "template_version": 0
+  },
+  "fixtures": [
+    {
+      "name": "invoiceitem",
+      "path": "/v1/invoiceitems",
+      "method": "post",
+      "params": {
+        "customer": "cus_UfOKwCc6BGQEyv",
+        "amount": 2500,
+        "currency": "usd",
+        "description": "Test dunning webhook"
+      }
+    },
+    {
+      "name": "invoice",
+      "path": "/v1/invoices",
+      "method": "post",
+      "params": {
+        "customer": "cus_UfOKwCc6BGQEyv",
+        "collection_method": "charge_automatically"
+      }
+    },
+    {
+      "name": "invoice_finalize",
+      "path": "/v1/invoices/${invoice:id}/finalize",
+      "method": "post"
+    },
+    {
+      "name": "invoice_pay",
+      "path": "/v1/invoices/${invoice:id}/pay",
+      "method": "post"
+    }
+  ]
+}

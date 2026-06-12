@@ -53,7 +53,7 @@ export async function getEmailConfig(userId: string): Promise<EmailConfig | null
     .single();
 
   // If no custom config found, use default Gmail fallback
-  if (error || !data || !data.smtp_host || !data.smtp_user) {
+  if (error || !data || !data.smtp_host || !data.smtp_user || !data.smtp_pass_encrypted) {
     const defaultConfig = getDefaultEmailConfig();
     if (!defaultConfig.pass) {
       console.error("[getEmailConfig] No custom SMTP and no GMAIL_APP_PASSWORD env var set");
